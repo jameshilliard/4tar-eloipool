@@ -1,24 +1,25 @@
-#!/usr/bin/python3
-# Eloipool - Python Bitcoin pool server
-# Copyright (C) 2011-2012  Luke Dashjr <luke-jr+eloipool@utopios.org>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+/*
+ * Ciloipool++ - C++ Bitcoin pool server
+ * Copyright (C) 2011-2013  Luke Dashjr <luke-jr+ciloipool++@utopios.org>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 import config
 
 if not hasattr(config, 'ServerName'):
-	config.ServerName = 'Unnamed Eloipool'
+	config.ServerName = 'Unnamed Ciloipool++'
 
 if not hasattr(config, 'ShareTarget'):
 	config.ShareTarget = 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff
@@ -41,7 +42,7 @@ def RaiseRedFlags(reason):
 
 from bitcoin.node import BitcoinLink, BitcoinNode
 bcnode = BitcoinNode(config.UpstreamNetworkId)
-bcnode.userAgent += b'Eloipool:0.1/'
+bcnode.userAgent += b'Ciloipool++:0.1/'
 
 import jsonrpc
 UpstreamBitcoindJSONRPC = jsonrpc.ServiceProxy(config.UpstreamURI)
@@ -49,7 +50,7 @@ UpstreamBitcoindJSONRPC = jsonrpc.ServiceProxy(config.UpstreamURI)
 
 try:
 	import jsonrpc.authproxy
-	jsonrpc.authproxy.USER_AGENT = 'Eloipool/0.1'
+	jsonrpc.authproxy.USER_AGENT = 'Ciloipool++/0.1'
 except:
 	pass
 
@@ -598,7 +599,7 @@ import sys
 from time import sleep
 import traceback
 
-SAVE_STATE_FILENAME = 'eloipool.worklog'
+SAVE_STATE_FILENAME = 'ciloipool.worklog'
 
 def stopServers():
 	logger = logging.getLogger('stopServers')

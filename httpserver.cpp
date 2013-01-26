@@ -1,18 +1,20 @@
-# Eloipool - Python Bitcoin pool server
-# Copyright (C) 2011-2012  Luke Dashjr <luke-jr+eloipool@utopios.org>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+/*
+ * Ciloipool++ - C++ Bitcoin pool server
+ * Copyright (C) 2011-2013  Luke Dashjr <luke-jr+ciloipool++@utopios.org>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 from base64 import b64decode
 from datetime import datetime
@@ -44,7 +46,7 @@ try:
 		_SourceFiles = tuple(x.encode('utf8') for x in _SourceFiles)
 		_GitDesc = os.popen('cd \'%s\' && git describe --dirty --always' % (_srcdir,)).read().strip().encode('utf8')
 except BaseException as e:
-	logging.getLogger('Licensing').critical('Error getting list of source files! AGPL requires this. To fix, be sure you are using git for Eloipool.\n' + traceback.format_exc())
+	logging.getLogger('Licensing').critical('Error getting list of source files! AGPL requires this. To fix, be sure you are using git for Ciloipool++.\n' + traceback.format_exc())
 	import sys
 	sys.exit(1)
 
@@ -79,7 +81,7 @@ class HTTPHandler(networkserver.SocketHandler):
 		buf = "HTTP/1.1 %d %s\r\n" % (status, self.HTTPStatus.get(status, 'Unknown'))
 		headers = dict(headers) if headers else {}
 		headers['Date'] = formatdate(timeval=mktime(datetime.now().timetuple()), localtime=False, usegmt=True)
-		headers.setdefault('Server', 'Eloipool')
+		headers.setdefault('Server', 'Ciloipool++')
 		if not _SourceFiles is None:
 			headers.setdefault('X-Source-Code', '/src/')
 		if body is None:
@@ -219,7 +221,7 @@ class HTTPHandler(networkserver.SocketHandler):
 			return self.sendReply(body=body, headers={'Content-Type':'text/html'})
 		if p == b'tar':
 			body = bytearray()
-			dn = b'eloipool-' + _GitDesc + b'/'
+			dn = b'ciloipoolpp-' + _GitDesc + b'/'
 			for f in _SourceFiles:
 				fs = f.decode('utf8')
 				fstat = os.lstat(fs)

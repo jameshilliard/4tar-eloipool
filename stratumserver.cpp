@@ -1,18 +1,20 @@
-# Eloipool - Python Bitcoin pool server
-# Copyright (C) 2011-2012  Luke Dashjr <luke-jr+eloipool@utopios.org>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+/*
+ * Ciloipool++ - C++ Bitcoin pool server
+ * Copyright (C) 2011-2013  Luke Dashjr <luke-jr+ciloipool++@utopios.org>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 from binascii import b2a_hex
 import collections
@@ -230,7 +232,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 			self.logger.info('Coinbase small enough for stratum again: reenabling')
 		
 		txn = deepcopy(merkleTree.data[0])
-		cb += self.extranonce1null + b'Eloi'
+		cb += self.extranonce1null + b'Ci++'
 		txn.setCoinbase(cb)
 		txn.assemble()
 		pos = txn.data.index(cb) + len(cb)

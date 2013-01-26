@@ -1,7 +1,7 @@
 ### Settings relating to server identity
 
 # Name of the server
-ServerName = 'Private Eloipool'
+ServerName = 'Private Ciloipool++'
 
 ### Settings relating to server scaling/load
 
@@ -47,8 +47,8 @@ IdleSleepTime = 0.1
 TrackerAddr = 'mrsP7M31efGkQHXb7nRiWLDjfV2M8oakf2'  # testnet
 
 # Coinbaser command to control reward delegation
-# NOTE: This example donates 1% of block rewards to Luke-Jr for Eloipool development
-CoinbaserCmd = 'echo -e "1\\n$((%d / 100))\\n1579aXhdwvKZEMrAKoCZhzGuqMa8EonuXU"'
+# NOTE: This example donates 1% of block rewards to Luke-Jr for Ciloipool++ development
+CoinbaserCmd = 'echo -e "1\\n$((%d / 100))\\n17wBzWmJ6aHLgGUpR7MRkPDj4YTZQnVSJj"'
 
 ### Settings relating to upstream data providers
 
@@ -90,15 +90,15 @@ Greedy = False
 ### Settings relating to network services
 
 # Addresses to listen on for JSON-RPC getwork server
-# Note that Eloipool only supports IPv6 sockets, and if you want to bind to an
-# IPv4 address you will need to prepend it with ::ffff: eg ::ffff:192.168.1.2
+# Note that Ciloipool++ only supports IPv6 sockets, and if you want to bind to
+# an IPv4 address you will need to prepend it with ::ffff: eg ::ffff:192.168.1.2
 JSONRPCAddresses = (
 	('', 8337),
 )
 
 # Addresses to listen on for Bitcoin node
-# Note that Eloipool only supports IPv6 sockets, and if you want to bind to an
-# IPv4 address you will need to prepend it with ::ffff: eg ::ffff:192.168.1.2
+# Note that Ciloipool++ only supports IPv6 sockets, and if you want to bind to
+# an IPv4 address you will need to prepend it with ::ffff: eg ::ffff:192.168.1.2
 BitcoinNodeAddresses = (
 	('', 8338),
 )
@@ -120,7 +120,7 @@ ShareLogging = (
 		'dbopts': {
 			'host': 'localhost',
 			'database': 'pooldb',
-			'user': 'eloipool',
+			'user': 'ciloipool',
 			'password': 'somethingsecret',
 		},
 		'statement': "insert into shares (rem_host, username, our_result, upstream_result, reason, solution) values ({Q(remoteHost)}, {username}, {YN(not(rejectReason))}, {YN(upstreamResult)}, {rejectReason}, decode({solution}, 'hex'))",
@@ -131,7 +131,7 @@ ShareLogging = (
 		'dbopts': {
 			'host': 'localhost',
 			'db': 'pooldb',
-			'user': 'eloipool',
+			'user': 'ciloipool',
 			'password': 'somethingsecret',
 		},
 		'statement': "insert into shares (rem_host, username, our_result, upstream_result, reason, solution) values ({Q(remoteHost)}, {username}, {YN(not(rejectReason))}, {YN(upstreamResult)}, {rejectReason}, unhex({solution}))",

@@ -1,4 +1,4 @@
-Please note that by distributing modifications to Eloipool without adding
+Please note that by distributing modifications to Ciloipool++ without adding
 yourself to the comments on the file (see example below), you are assigning
 copyright of your modification to the original developer (Luke Dashjr).
 It is preferred to assign copyrights for various reasons.
@@ -6,7 +6,7 @@ Suggested reading: http://www.gnu.org/licenses/why-assign.html
 
 If you choose not to assign copyright of your modifications, you must add
 a header like this to the files you have modified:
-# Portions Copyright (C) 2012  Your Name <Your@Email>
+ * Portions Copyright (C) 2013  Your Name <Your@Email>
 
 --
 
