@@ -16,41 +16,65 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-from struct import pack, unpack
+#include <assert.h>
+#include "../tweaks.h"
+#include "varlen.h"
 
-_ignoredrc = [0]
+unsigned _varlen_ignoredrc;
 
-def varlenDecode(b, rc = _ignoredrc):
-	if b[0] == 0xff:
-		rc[0] += 9
-		return (unpack('<Q', b[1:9])[0], b[9:])
-	if b[0] == 0xfe:
-		rc[0] += 5
-		return (unpack('<L', b[1:5])[0], b[5:])
-	if b[0] == 0xfd:
-		rc[0] += 3
-		return (unpack('<H', b[1:3])[0], b[3:])
-	rc[0] += 1
-	return (b[0], b[1:])
+uint64_t varlenDecode(const bytes_t b, bytes_t &out_b, unsigned *rc) {
+	if (b[0] == 0xff)
+	{
+		rc[0] += 9;
+		out_b = bytes_t(b.begin() + 9, b.end());
+		return unpack_LE_Q(&b[1]);
+	}
+	if (b[0] == 0xfe)
+	{
+		rc[0] += 5;
+		out_b = bytes_t(b.begin() + 5, b.end());
+		return unpack_LE_L(&b[1]);
+	}
+	if (b[0] == 0xfd)
+	{
+		rc[0] += 3;
+		out_b = bytes_t(b.begin() + 3, b.end());
+		return unpack_LE_H(&b[1]);
+	}
+	rc[0] += 1;
+	out_b = bytes_t(b.begin() + 1, b.end());
+	return b[0];
+}
 
-def varlenEncode(n):
-	if n < 0xfd:
-		return pack('<B', n)
-	if n <= 0xffff:
-		return b'\xfd' + pack('<H', n)
-	if n <= 0xffffffff:
-		return b'\xfe' + pack('<L', n)
-	return b'\xff' + pack('<Q', n)
+bytes_t varlenEncode(uint64_t n) {
+	if (n < 0xfd)
+		return bytes_t(1, n);
+	bytes_t rv;
+	if (n <= 0xffff)
+	{
+		rv.push_back('\xfd');
+		pack_LE_H(rv, n);
+		return rv;
+	}
+	if (n <= 0xffffffff)
+	{
+		rv.push_back('\xfe');
+		pack_LE_L(rv, n);
+		return rv;
+	}
+	rv.push_back('\xff');
+	pack_LE_Q(rv, n);
+	return rv;
+}
 
-# tests
-def _test():
-	assert b'\0' == varlenEncode(0)
-	assert b'\xfc' == varlenEncode(0xfc)
-	assert b'\xfd\xfd\0' == varlenEncode(0xfd)
-	assert b'\xfd\xff\xff' == varlenEncode(0xffff)
-	assert b'\xfe\0\0\1\0' == varlenEncode(0x10000)
-	assert b'\xfe\xff\xff\xff\xff' == varlenEncode(0xffffffff)
-	assert b'\xff\0\0\0\0\1\0\0\0' == varlenEncode(0x100000000)
-	assert b'\xff\xff\xff\xff\xff\xff\xff\xff\xff' == varlenEncode(0xffffffffffffffff)
-
-_test()
+// tests
+INIT(test) {
+	assert(BYTES(0) == varlenEncode(0));
+	assert(BYTES(0xfc) == varlenEncode(0xfc));
+	assert(BYTES(0xfd, 0xfd, 0) == varlenEncode(0xfd));
+	assert(BYTES(0xfd, 0xff, 0xff) == varlenEncode(0xffff));
+	assert(BYTES(0xfe, 0, 0, 1, 0) == varlenEncode(0x10000));
+	assert(BYTES(0xfe, 0xff, 0xff, 0xff, 0xff) == varlenEncode(0xffffffff));
+	assert(BYTES(0xff, 0, 0, 0, 0, 1, 0, 0, 0) == varlenEncode(0x100000000));
+	assert(BYTES(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff) == varlenEncode(0xffffffffffffffff));
+}
