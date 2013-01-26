@@ -1,13 +1,10 @@
-*.pyc
-*.pyo
+*.o
 *~
 *.bak
-config*.py
-jsonrpc
+config*.cpp
+jsonrpc-cpp
 *.patch
 .*.kate-swp
-base58.py
-midstate.so
 *.orig
 *.rej
-eloipool.worklog
+ciloipool.worklog
