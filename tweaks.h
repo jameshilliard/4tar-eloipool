@@ -7,7 +7,7 @@
 #define INIT(name) __attribute__((constructor)) static void __init_ ## name ()
 
 typedef std::vector<uint8_t> bytes_t;
-#define BYTES(...)  std::vector<uint8_t>({__VA_ARGS__})
+#define BYTES(...)  bytes_t({__VA_ARGS__})
 
 #define unpack_LE_H(data) ((data)[0] | (((uint16_t)((data)[1])) << 8))
 #define unpack_LE_L(data) (unpack_LE_H(data) | (((uint32_t)unpack_LE_H(&(data)[2])) << 16))
@@ -28,6 +28,15 @@ typedef std::vector<uint8_t> bytes_t;
 	pack_LE_L(v, _tmp_LE_Q & 0xffffffff);  \
 	pack_LE_L(v, (_tmp_LE_Q & 0xffffffff00000000) >> 32);  \
 } while(0)
+
+#define BYTES_APPEND(v, expr)  do {  \
+	bytes_t tmp = expr;  \
+	v.insert(v.end(), tmp.begin(), tmp.end());  \
+} while(0)
+
+struct ValueError {
+	const char *err;
+};
 
 struct AssertionError {};
 #define asserte(expr) do {  \
