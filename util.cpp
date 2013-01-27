@@ -125,9 +125,10 @@ class shareLogFormatter:
 #endif
 
 bytes_t dblsha(bytes_t b) {
-	char digest[32];
+	char digest[32], digest2[32];
 	gcry_md_hash_buffer(GCRY_MD_SHA256, digest, b.data(), b.size());
-	return bytes_t(&digest[0], &digest[31]);
+	gcry_md_hash_buffer(GCRY_MD_SHA256, digest2, digest, 32);
+	return bytes_t(&digest2[0], &digest2[32]);
 }
 
 #if 0
