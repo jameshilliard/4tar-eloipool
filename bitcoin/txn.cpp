@@ -16,133 +16,180 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import bitcoin.script
-from .varlen import varlenDecode, varlenEncode
-from util import dblsha
-from struct import pack, unpack
+#include <assert.h>
+#include "../tweaks.h"
+#include "txn.h"
 
-_nullprev = b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0'
+#include "script.h"
+#include "varlen.h"  // varlenDecode, varlenEncode
+#include "../util.h"  // dblsha
+//from struct import pack, unpack
 
-class Txn:
-	def __init__(self, data=None):
-		if data:
-			self.data = data
-			self.idhash()
-	
-	@classmethod
-	def new(cls):
-		o = cls()
-		o.version = 1
-		o.inputs = []
-		o.outputs = []
-		o.locktime = 0
-		return o
-	
-	def setCoinbase(self, sigScript, seqno = 0xffffffff, height = None):
-		if not height is None:
-			# NOTE: This is required to be the minimum valid length by BIP 34
-			sigScript = bitcoin.script.encodeUNum(height) + sigScript
-		self.inputs = ( ((_nullprev, 0xffffffff), sigScript, seqno), )
-	
-	def addInput(self, prevout, sigScript, seqno = 0xffffffff):
-		self.inputs.append( (prevout, sigScript, seqno) )
-	
-	def addOutput(self, amount, pkScript):
-		self.outputs.append( (amount, pkScript) )
-	
-	def disassemble(self, retExtra = False):
-		self.version = unpack('<L', self.data[:4])[0]
-		rc = [4]
-		
-		(inputCount, data) = varlenDecode(self.data[4:], rc)
-		inputs = []
-		for i in range(inputCount):
-			prevout = (data[:32], unpack('<L', data[32:36])[0])
-			rc[0] += 36
-			(sigScriptLen, data) = varlenDecode(data[36:], rc)
-			sigScript = data[:sigScriptLen]
-			seqno = unpack('<L', data[sigScriptLen:sigScriptLen + 4])[0]
-			data = data[sigScriptLen + 4:]
-			rc[0] += sigScriptLen + 4
-			inputs.append( (prevout, sigScript, seqno) )
-		self.inputs = inputs
-		
-		(outputCount, data) = varlenDecode(data, rc)
-		outputs = []
-		for i in range(outputCount):
-			amount = unpack('<Q', data[:8])[0]
-			rc[0] += 8
-			(pkScriptLen, data) = varlenDecode(data[8:], rc)
-			pkScript = data[:pkScriptLen]
-			data = data[pkScriptLen:]
-			rc[0] += pkScriptLen
-			outputs.append( (amount, pkScript) )
-		self.outputs = outputs
-		
-		self.locktime = unpack('<L', data[:4])[0]
-		if not retExtra:
-			assert len(data) == 4
-		else:
-			assert data == self.data[rc[0]:]
-			data = data[4:]
-			rc[0] += 4
-			self.data = self.data[:rc[0]]
-			return data
-	
-	def isCoinbase(self):
-		return len(self.inputs) == 1 and self.inputs[0][0] == (_nullprev, 0xffffffff)
-	
-	def getCoinbase(self):
-		return self.inputs[0][1]
-	
-	def assemble(self):
-		data = pack('<L', self.version)
-		
-		inputs = self.inputs
-		data += varlenEncode(len(inputs))
-		for prevout, sigScript, seqno in inputs:
-			data += prevout[0] + pack('<L', prevout[1])
-			data += varlenEncode(len(sigScript)) + sigScript
-			data += pack('<L', seqno)
-		
-		outputs = self.outputs
-		data += varlenEncode(len(outputs))
-		for amount, pkScript in outputs:
-			data += pack('<Q', amount)
-			data += varlenEncode(len(pkScript)) + pkScript
-		
-		data += pack('<L', self.locktime)
-		
-		self.data = data
-		self.idhash()
-	
-	def idhash(self):
-		self.txid = dblsha(self.data)
+namespace bitcoin {
+	namespace txn {
 
-# Txn tests
-def _test():
-	d = b'\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00'
-	t = Txn(d)
-	assert t.txid == b"C\xeczW\x9fUa\xa4*~\x967\xadAVg'5\xa6X\xbe'R\x18\x18\x01\xf7#\xba3\x16\xd2"
-	t.disassemble()
-	t.assemble()
-	assert t.data == d
-	assert not t.isCoinbase()
-	t = Txn.new()
-	t.addInput((b' '*32, 0), b'INPUT')
-	t.addOutput(0x10000, b'OUTPUT')
-	t.assemble()
-	assert t.txid == b'>`\x97\xecu\x8e\xb5\xef\x19k\x17d\x96sw\xb1\xf1\x9bO\x1c6\xa0\xbe\xf7N\xed\x13j\xfdHF\x1a'
-	t.disassemble()
-	t.assemble()
-	assert t.txid == b'>`\x97\xecu\x8e\xb5\xef\x19k\x17d\x96sw\xb1\xf1\x9bO\x1c6\xa0\xbe\xf7N\xed\x13j\xfdHF\x1a'
-	assert not t.isCoinbase()
-	t = Txn.new()
-	t.setCoinbase(b'COINBASE')
-	t.addOutput(0x10000, b'OUTPUT')
-	assert t.isCoinbase()
-	assert t.getCoinbase() == b'COINBASE'
-	t.assemble()
-	assert t.txid == b'n\xb9\xdc\xef\xe9\xdb(R\x8dC~-\xef~\x88d\x15+X\x13&\xb7\xbc$\xb1h\xf3g=\x9b~V'
+bytes_t _nullprev(32);
 
-_test()
+Txn::Txn(bytes_t data) {
+	if (!data.empty())
+	{
+		this->data = data;
+		idhash();
+	}
+}
+
+Txn Txn::newclean() {
+	Txn o;
+	o.version = 1;
+	o.inputs.clear();
+	o.outputs.clear();
+	o.locktime = 0;
+	return o;
+}
+
+void Txn::setCoinbase(const bytes_t sigScript_in, uint32_t seqno, blkheight_t height) {
+	bytes_t sigScript;
+	if (height)
+		// NOTE: This is required to be the minimum valid length by BIP 34
+		sigScript = bitcoin::script::encodeUNum(height);
+	BYTES_APPEND(sigScript, sigScript_in);
+	inputs.clear();
+	inputs.push_back(_TxnIn(_TxnOutpoint(_nullprev, 0xffffffff), sigScript, seqno));
+}
+
+void Txn::addInput(_TxnOutpoint prevout, bytes_t sigScript, uint32_t seqno) {
+	inputs.push_back(_TxnIn(prevout, sigScript, seqno));
+}
+
+void Txn::addOutput(uint64_t amount, bytes_t pkScript) {
+	outputs.push_back(_TxnOut(amount, pkScript));
+}
+
+bytes_t Txn::disassemble(bool retExtra) {
+	version = unpack_LE_L(data);
+	unsigned _rc = 4;
+	unsigned *rc = &_rc;
+	
+	bytes_t data = this->data;
+	data.erase(data.begin(), data.begin() + 4);
+	uint64_t inputCount = varlenDecode(data, data, rc);
+	std::vector<_TxnIn> inputs;
+	for (uint64_t i = 0; i < inputCount; ++i)
+	{
+		_TxnOutpoint prevout(bytes_t(data.begin(), data.begin() + 32), unpack_LE_L(&data[32]));
+		rc[0] += 36;
+		data.erase(data.begin(), data.begin() + 36);
+		uint64_t sigScriptLen = varlenDecode(data, data, rc);
+		bytes_t sigScript(data.begin(), data.begin() + sigScriptLen);
+		uint32_t seqno = unpack_LE_L(&data[sigScriptLen]);
+		data.erase(data.begin(), data.begin() + sigScriptLen + 4);
+		rc[0] += sigScriptLen + 4;
+		inputs.push_back(_TxnIn(prevout, sigScript, seqno));
+	}
+	this->inputs = inputs;
+	
+	uint64_t outputCount = varlenDecode(data, data, rc);
+	std::vector<_TxnOut> outputs;
+	for (uint64_t i = 0; i < outputCount; ++i)
+	{
+		uint64_t amount = unpack_LE_Q(data);
+		rc[0] += 8;
+		data.erase(data.begin(), data.begin() + 8);
+		uint64_t pkScriptLen = varlenDecode(data, data, rc);
+		bytes_t pkScript(data.begin(), data.begin() + pkScriptLen);
+		data.erase(data.begin(), data.begin() + pkScriptLen);
+		rc[0] += pkScriptLen;
+		outputs.push_back(_TxnOut(amount, pkScript));
+	}
+	this->outputs = outputs;
+	
+	locktime = unpack_LE_L(data);
+	if (!retExtra)
+		asserte(data.size() == 4);
+	else
+	{
+		asserte(data == bytes_t(this->data.begin() + rc[0], this->data.end()));
+		data.erase(data.begin(), data.begin() + 4);
+		rc[0] += 4;
+		this->data.erase(data.begin() + rc[0], data.end());
+		return data;
+	}
+}
+
+bool Txn::isCoinbase() {
+	return inputs.size() == 1 && inputs[0].prevout == _TxnOutpoint(_nullprev, 0xffffffff);
+}
+
+bytes_t Txn::getCoinbase() {
+	return this->inputs[0].sigScript;
+}
+
+void Txn::assemble() {
+	bytes_t data;
+	pack_LE_L(data, version);
+	
+	BYTES_APPEND(data, varlenEncode(inputs.size()));
+	for (std::vector<_TxnIn>::iterator it = inputs.begin(); it != inputs.end(); ++it)
+	{
+		_TxnOutpoint & prevout = it->prevout;
+		bytes_t & sigScript = it->sigScript;
+		uint32_t & seqno = it->seqno;
+		
+		BYTES_APPEND(data, prevout.txid);
+		pack_LE_L(data, prevout.index);
+		BYTES_APPEND(data, varlenEncode(sigScript.size()));
+		BYTES_APPEND(data, sigScript);
+		pack_LE_L(data, seqno);
+	}
+	
+	BYTES_APPEND(data, varlenEncode(outputs.size()));
+	for (std::vector<_TxnOut>::iterator it = outputs.begin(); it != outputs.end(); ++it)
+	{
+		uint64_t & amount = it->amount;
+		bytes_t & pkScript = it->pkScript;
+		
+		pack_LE_Q(data, amount);
+		BYTES_APPEND(data, varlenEncode(pkScript.size()));
+		BYTES_APPEND(data, pkScript);
+	}
+	
+	pack_LE_L(data, locktime);
+	
+	this->data = data;
+	idhash();
+}
+
+void Txn::idhash() {
+	txid = dblsha(data);
+}
+
+// Txn tests
+INIT(test) {
+	bytes_t d{1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	bytes_t x=d;
+	Txn t(d);
+	assert(t.txid == BYTES('C', 0xec, 'z', 'W', 0x9f, 'U', 'a', 0xa4, '*', '~', 0x96, '7', 0xad, 'A', 'V', 'g', '\'', '5', 0xa6, 'X', 0xbe, '\'', 'R', 0x18, 0x18, 1, 0xf7, '#', 0xba, '3', 0x16, 0xd2));
+	t.disassemble();
+	t.assemble();
+	assert(t.data == d);
+	assert(!t.isCoinbase());
+	t = Txn::newclean();
+	t.addInput(_TxnOutpoint(bytes_t(32, ' '), 0), BYTES('I','N','P','U','T'));
+	t.addOutput(0x10000, BYTES('O','U','T','P','U','T'));
+	t.assemble();
+	assert(t.txid == BYTES('>', '`', 0x97, 0xec, 'u', 0x8e, 0xb5, 0xef, 0x19, 'k', 0x17, 'd', 0x96, 's', 'w', 0xb1, 0xf1, 0x9b, 'O', 0x1c, '6', 0xa0, 0xbe, 0xf7, 'N', 0xed, 0x13, 'j', 0xfd, 'H', 'F', 0x1a));
+	t.disassemble();
+	t.assemble();
+	assert(t.txid == BYTES('>', '`', 0x97, 0xec, 'u', 0x8e, 0xb5, 0xef, 0x19, 'k', 0x17, 'd', 0x96, 's', 'w', 0xb1, 0xf1, 0x9b, 'O', 0x1c, '6', 0xa0, 0xbe, 0xf7, 'N', 0xed, 0x13, 'j', 0xfd, 'H', 'F', 0x1a));
+	assert(!t.isCoinbase());
+	t = Txn::newclean();
+	t.setCoinbase(BYTES('C','O','I','N','B','A','S','E'));
+	t.addOutput(0x10000, BYTES('O','U','T','P','U','T'));
+	assert(t.isCoinbase());
+	assert(t.getCoinbase() == BYTES('C','O','I','N','B','A','S','E'));
+	t.assemble();
+	assert(t.txid == BYTES('n', 0xb9, 0xdc, 0xef, 0xe9, 0xdb, '(', 'R', 0x8d, 'C', '~', '-', 0xef, '~', 0x88, 'd', 0x15, '+', 'X', 0x13, '&', 0xb7, 0xbc, '$', 0xb1, 'h', 0xf3, 'g', '=', 0x9b, '~', 'V'));
+}
+
+	};
+};

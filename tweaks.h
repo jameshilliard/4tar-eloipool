@@ -9,6 +9,8 @@
 typedef std::vector<uint8_t> bytes_t;
 #define BYTES(...)  bytes_t({__VA_ARGS__})
 
+typedef uint64_t blkheight_t;
+
 #define unpack_LE_H(data) ((data)[0] | (((uint16_t)((data)[1])) << 8))
 #define unpack_LE_L(data) (unpack_LE_H(data) | (((uint32_t)unpack_LE_H(&(data)[2])) << 16))
 #define unpack_LE_Q(data) (unpack_LE_L(data) | (((uint64_t)unpack_LE_L(&(data)[4])) << 32))
