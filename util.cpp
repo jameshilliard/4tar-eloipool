@@ -16,8 +16,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-from hashlib import sha256
-from math import log
+#include "tweaks.h"
+
+#include <gcrypt.h>
+#include <math.h>  // log
+#if 0
 import re
 import string
 from struct import unpack
@@ -119,10 +122,15 @@ class shareLogFormatter:
 	@classmethod
 	def get_field_target2pdiff(self, subfunc):
 		return lambda s: target2pdiff(subfunc(s))
+#endif
 
-def dblsha(b):
-	return sha256(sha256(b).digest()).digest()
+bytes_t dblsha(bytes_t b) {
+	char digest[32];
+	gcry_md_hash_buffer(GCRY_MD_SHA256, digest, b.data(), b.size());
+	return bytes_t(&digest[0], &digest[31]);
+}
 
+#if 0
 def swap32(b):
 	o = b''
 	for i in range(0, len(b), 4):
@@ -214,3 +222,4 @@ class WithNoop:
 	def __exit__(self, *a):
 		pass
 WithNoop = WithNoop()
+#endif
