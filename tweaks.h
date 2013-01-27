@@ -29,4 +29,10 @@ typedef std::vector<uint8_t> bytes_t;
 	pack_LE_L(v, (_tmp_LE_Q & 0xffffffff00000000) >> 32);  \
 } while(0)
 
+struct AssertionError {};
+#define asserte(expr) do {  \
+	if (!(expr))  \
+		throw AssertionError();  \
+} while(0)
+
 #endif
