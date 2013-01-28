@@ -16,7 +16,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <iostream>
+#include <tuple>
 #include "tweaks.h"
+#include "util.h"
 
 #include <gcrypt.h>
 #include <math.h>  // log
@@ -168,55 +171,89 @@ class RejectedShare(ValueError):
 	pass
 
 PendingUpstream = object()
+#endif
 
 
-import heapq
+#include <queue>
 
-class ScheduleDict:
-	def __init__(self):
-		self._dict = {}
-		self._build_heap()
-	
-	def _build_heap(self):
-		newheap = list((v[0], k, v[1]) for k, v in self._dict.items())
-		heapq.heapify(newheap)
-		self._heap = newheap
-	
-	def nextTime(self):
-		while True:
-			(t, k, o) = self._heap[0]
-			if k in self._dict:
-				break
-			heapq.heappop(self._heap)
-		return t
-	
-	def shift(self):
-		while True:
-			(t, k, o) = heapq.heappop(self._heap)
-			if k in self._dict:
-				break
-		del self._dict[k]
-		return o
-	
-	def __setitem__(self, o, t):
-		k = id(o)
-		self._dict[k] = (t, o)
-		if len(self._heap) / 2 > len(self._dict):
-			self._build_heap()
-		else:
-			heapq.heappush(self._heap, (t, k, o))
-	
-	def __getitem__(self, o):
-		return self._dict[id(o)][0]
-	
-	def __delitem__(self, o):
-		del self._dict[id(o)]
-		if len(self._dict) < 2:
-			self._build_heap()
-	
-	def __len__(self):
-		return len(self._dict)
+bool ScheduleDict::comparer::operator() (const pq_element_t & lhs, const pq_element_t & rhs) const {
+	return std::get<0>(lhs) < std::get<0>(rhs);
+}
 
+ScheduleDict::ScheduleDict() :
+	_dict(),
+	_heap()
+{
+	_build_heap();
+}
+
+void ScheduleDict::_build_heap() {
+	std::vector<pq_element_t> newheap;
+	for (auto it = _dict.begin(); it != _dict.end(); ++it)
+		newheap.push_back(pq_element_t(it->second.first, it->first, it->second.second));
+	_heap = pq_t(newheap.begin(), newheap.end());
+}
+
+time_t ScheduleDict::nextTime() {
+	time_t t;
+	while (true)
+	{
+		auto & top = _heap.top();
+		t = std::get<0>(top);
+		auto & k = std::get<1>(top);
+		auto & o = std::get<2>(top);
+		if (_dict.count(k))
+			break;
+		_heap.pop();
+	}
+	return t;
+}
+
+std::function<void()> ScheduleDict::shift() {
+	std::function<void()> o;
+	void *k;
+	while (true)
+	{
+		auto & top = _heap.top();
+		auto & t = std::get<0>(top);
+		k = std::get<1>(top);
+		o = std::get<2>(top);
+		_heap.pop();
+		if (_dict.count(k))
+			break;
+	}
+	_dict.erase(k);
+	return o;
+}
+
+void ScheduleDict::__setitem__(std::function<void()> & o, time_t t) {
+	auto k = (void*)&o;
+	_dict[k] = std::pair<time_t, std::function<void()> >(t, o);
+	if (_heap.size() / 2 > _dict.size())
+		_build_heap();
+	else
+		_heap.push(pq_element_t(t, (void*)&o, o));
+}
+
+time_t ScheduleDict::__getitem__(std::function<void()> & o) {
+	return _dict[(void*)&o].first;
+}
+
+void ScheduleDict::erase(std::function<void()> & o) {
+	_dict.erase((void*)&o);
+	if (_dict.size() < 2)
+		_build_heap();
+}
+
+size_t ScheduleDict::size() {
+	return _dict.size();
+}
+
+bool ScheduleDict::empty() {
+	return _dict.empty();
+}
+
+#if 0
 class WithNoop:
 	def __enter__(self):
 		pass
