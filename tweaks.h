@@ -5,6 +5,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <vector>
+#include <iostream>
+#include <sstream>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 
@@ -87,5 +90,22 @@ private:
 };
 
 typedef boost::lock_guard<SomeLockable> ScopedLock;
+
+template <typename T>
+std::basic_string<T> formatdate(boost::posix_time::ptime t) {
+	std::basic_stringstream<T> s;
+	// FIXME: "Fri, 09 Nov 2001 01:08:47 -0000"
+	static boost::posix_time::time_facet facet("%Y%m%d_%H%M%S");
+	std::locale loc(s.getloc(), &facet);
+	s.imbue(loc);
+	s << t;
+	return s.str();
+}
+
+template <typename T, typename U, typename V>
+void SETDEFAULT(T & dict, U & key, V & def) {
+	if (!dict.count(key))
+		dict[key] = def;
+}
 
 #endif

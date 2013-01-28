@@ -32,6 +32,8 @@
 //import traceback
 #include "util.h"  // ScheduleDict, WithNoop, tryErr
 
+namespace networkserver {
+
 // From Python 3.2 asynchat.find_prefix_at_end
 static size_t find_prefix_at_end(bytes_t haystack, bytes_t needle) {
 	size_t l = needle.size() - 1;
@@ -662,3 +664,5 @@ void AsyncSocketServer::serve_forever() {
 	doing = NULL;
 	running = false;
 }
+
+};

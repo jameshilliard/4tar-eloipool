@@ -19,6 +19,8 @@
 
 #include "util.h"
 
+namespace networkserver {
+
 #define EPOLL_READ (EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP)
 #define EPOLL_WRITE EPOLLOUT
 
@@ -37,6 +39,8 @@ public:
 	virtual void handle_error() { throw NotImplementedError(); };
 	virtual void handle_close() { throw NotImplementedError(); };
 	virtual void boot() { throw NotImplementedError(); };
+	
+	log4cxx::LoggerPtr logger;
 };
 
 typedef _SocketHandlerInterface *(*_SocketHandlerFactory_t)(AsyncSocketServer & server, socket_t sck, _SockAddr addr);
@@ -143,6 +147,7 @@ public:
 	std::map<void *, _SocketHandlerInterface *> connections;
 	bytes_t *lastReadbuf;
 	_SocketHandlerInterface *lastHandler;
+	std::vector<std::string> TrustedForwarders;
 
 private:
 	log4cxx::LoggerPtr logger;
@@ -151,7 +156,8 @@ private:
 	ScheduleDict _sch;
 	SomeLockable *_schLock;
 	std::map<void *, _SocketHandlerInterface *> _schEH;
-	std::vector<std::string> TrustedForwarders;
+};
+
 };
 
 #endif
