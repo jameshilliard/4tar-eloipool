@@ -252,12 +252,3 @@ size_t ScheduleDict::size() {
 bool ScheduleDict::empty() {
 	return _dict.empty();
 }
-
-#if 0
-class WithNoop:
-	def __enter__(self):
-		pass
-	def __exit__(self, *a):
-		pass
-WithNoop = WithNoop()
-#endif

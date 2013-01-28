@@ -2,7 +2,11 @@
 #define TWEAKS_H
 
 #include <stdint.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <vector>
+#include <boost/thread/locks.hpp>
+#include <boost/thread/mutex.hpp>
 
 #define INIT(name) __attribute__((constructor)) static void __init_ ## name ()
 
@@ -10,6 +14,8 @@ typedef std::vector<uint8_t> bytes_t;
 #define BYTES(...)  bytes_t({__VA_ARGS__})
 
 typedef uint64_t blkheight_t;
+
+typedef int socket_t;
 
 #define unpack_LE_H(data) ((data)[0] | (((uint16_t)((data)[1])) << 8))
 #define unpack_LE_L(data) (unpack_LE_H(data) | (((uint32_t)unpack_LE_H(&(data)[2])) << 16))
@@ -36,6 +42,15 @@ typedef uint64_t blkheight_t;
 	v.insert(v.end(), tmp.begin(), tmp.end());  \
 } while(0)
 
+class KeyError : std::exception {};
+struct NotImplementedError {
+	const char *err;
+};
+class SocketError : std::exception {
+public:
+	SocketError(int sck_errno) : std::exception(), sck_errno(sck_errno) {}
+	int sck_errno;
+};
 struct ValueError {
 	const char *err;
 };
@@ -45,5 +60,32 @@ struct AssertionError {};
 	if (!(expr))  \
 		throw AssertionError();  \
 } while(0)
+
+#define setnonblocking(sck)  fcntl(sck, F_SETFL, fcntl(sck, F_GETFL, 0) | O_NONBLOCK);
+
+class SomeLockable {
+public:
+	virtual void lock() = 0;
+	virtual bool try_lock() = 0;
+	virtual void unlock() = 0;
+};
+
+class FakeLockable : public SomeLockable {
+public:
+	virtual void lock() {};
+	virtual bool try_lock() { return true; };
+	virtual void unlock() {};
+};
+
+class MutexLockable : public SomeLockable {
+public:
+	virtual void lock() { mutex.lock(); };
+	virtual bool try_lock() { return mutex.try_lock(); };
+	virtual void unlock() { mutex.unlock(); }
+private:
+	boost::mutex mutex;
+};
+
+typedef boost::lock_guard<SomeLockable> ScopedLock;
 
 #endif
