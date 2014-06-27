@@ -280,7 +280,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 			return
 		elif self.rejecting:
 			self.rejecting = False
-			self.logger.info('Coinbase small enough for stratum again: reenabling')
+			self.logger.info('Coinbase small enough for stratum again: re-enabling')
 
 		txn = deepcopy(merkleTree.data[0])
 		cb += self.extranonce1null + b'Eloi'
