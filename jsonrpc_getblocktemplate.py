@@ -26,7 +26,7 @@ class _getblocktemplate:
 	def final_init(server):
 		ShareTargetHex = '%064x' % (server.ShareTarget,)
 		JSONRPCHandler.getblocktemplate_rv_template['target'] = ShareTargetHex
-	
+
 	getblocktemplate_rv_template = {
 		'longpoll': '/LP',
 		'mutable': [
@@ -38,7 +38,7 @@ class _getblocktemplate:
 		'expires': 120,
 		'version': 2,
 		'submitold': True,
-		
+
 		# Bitcoin-specific:
 		'sigoplimit': 20000,
 		'sizelimit': 1000000,
@@ -46,16 +46,16 @@ class _getblocktemplate:
 	def doJSON_getblocktemplate(self, params):
 		if 'mode' in params and params['mode'] != 'template':
 			raise AttributeError('getblocktemplate mode "%s" not supported' % (params['mode'],))
-		
+
 		if 'longpollid' in params:
 			self.processLP(params['longpollid'])
-		
+
 		RequestedTarget = None
 		try:
 			RequestedTarget = int(params['target'], 16)
 		except:
 			pass
-		
+
 		rv = dict(self.getblocktemplate_rv_template)
 		p_magic = [False]
 		(MC, wld, target) = self.server.getBlockTemplate(self.Username, p_magic=p_magic, RequestedTarget=RequestedTarget)
@@ -87,7 +87,7 @@ class _getblocktemplate:
 		txno['data'] = b2a_hex(t.data).decode('ascii')
 		rv['coinbasetxn'] = txno
 		return rv
-	
+
 	def doJSON_submitblock(self, data, params = _NoParams):
 		data = bytes.fromhex(data)
 		share = {

@@ -28,7 +28,7 @@ class sql:
 		'format': '%s',
 		'pyformat': '%s',
 	}
-	
+
 	def __init__(self, **ka):
 		self.opts = ka
 		dbe = ka['engine']
@@ -45,7 +45,7 @@ class sql:
 			self._queue = Queue()
 			self._logShareF = self._queue.put
 			threading.Thread(target=self._thread).start()
-	
+
 	def _doInsert(self, o):
 		(stmt, params) = o
 		dbc = self.db.cursor()
@@ -56,7 +56,7 @@ class sql:
 			self.exceptions.append((stmt, params, e))
 			return
 		self.db.commit()
-	
+
 	def _thread(self):
 		self._connect()
 		while True:
@@ -69,7 +69,7 @@ class sql:
 			except:
 				_logger.critical(traceback.format_exc())
 		self._shutdown()
-	
+
 	def setup_mysql(self):
 		import pymysql
 		dbopts = self.opts.get('dbopts', {})
@@ -77,33 +77,33 @@ class sql:
 			dbopts['passwd'] = dbopts['password']
 			del dbopts['password']
 		self.modsetup(pymysql)
-	
+
 	def setup_postgres(self):
 		import psycopg2
 		self.opts.setdefault('statement', "insert into shares (rem_host, username, our_result, upstream_result, reason, solution) values ({Q(remoteHost)}, {username}, {YN(not(rejectReason))}, {YN(upstreamResult)}, {rejectReason}, decode({solution}, 'hex'))")
 		self.modsetup(psycopg2)
-	
+
 	def setup_sqlite(self):
 		import sqlite3
 		self.modsetup(sqlite3)
-	
+
 	def modsetup(self, mod):
 		self._mod = mod
 		psf = self._psf[mod.paramstyle]
 		self.opts.setdefault('statement', "insert into shares (remoteHost, username, rejectReason, upstreamResult, solution) values ({remoteHost}, {username}, {rejectReason}, {upstreamResult}, {solution})")
 		stmt = self.opts['statement']
 		self.pstmt = shareLogFormatter(stmt, psf)
-	
+
 	def _connect(self):
 		self.db = self._mod.connect(**self.opts.get('dbopts', {}))
-	
+
 	def logShare(self, share):
 		o = self.pstmt.applyToShare(share)
 		self._logShareF(o)
-	
+
 	def stop(self):
 		# NOTE: this is replaced with _shutdown directly for threadsafe objects
 		self._queue.put(None)
-	
+
 	def _shutdown(self):
 		pass # TODO

@@ -33,7 +33,7 @@ class _getmemorypool:
 	def final_init(server):
 		ShareTargetHex = '%064x' % (server.ShareTarget,)
 		JSONRPCHandler.getmemorypool_rv_template['target'] = ShareTargetHex
-	
+
 	getmemorypool_rv_template = {
 		'longpoll': '/LP',
 		'mutable': [
@@ -56,10 +56,10 @@ class _getmemorypool:
 			raise TypeError('getmemorypool() takes at most 2 positional arguments (%d given)' % (len(a),))
 		elif params.get('mode', 'template') != 'template':
 			raise AttributeError('getmemorypool mode "%s" not supported' % (sp['mode'],))
-		
+
 		if 'longpollid' in params:
 			self.processLP(params['longpollid'])
-		
+
 		rv = dict(self.getmemorypool_rv_template)
 		(MC, wld, target) = self.server.getBlockTemplate(self.Username)
 		(dummy, merkleTree, cb, prevBlock, bits) = MC[:5]
@@ -81,7 +81,7 @@ class _getmemorypool:
 		t.assemble()
 		rv['coinbasetxn'] = b2a_hex(t.data).decode('ascii')
 		return rv
-	
+
 	def doJSON_submitblock(self, data, params = _NoParams):
 		data = bytes.fromhex(data)
 		share = {

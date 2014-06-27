@@ -24,9 +24,9 @@ def _RunCLI():
 		raise None
 	except:
 		namespace = sys.exc_info()[2].tb_frame.f_back.f_back.f_globals
-	
+
 	namespace.setdefault('exit', exit)
-	
+
 	def CLI():
 		while True:
 			code.interact(local=namespace, banner='')

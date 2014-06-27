@@ -25,7 +25,7 @@ class MerkleTree:
 	def __init__(self, data, detailed=False):
 		self.data = data
 		self.recalculate(detailed)
-	
+
 	def recalculate(self, detailed=False):
 		L = self.data
 		steps = []
@@ -53,7 +53,7 @@ class MerkleTree:
 				Ll = len(L)
 		self._steps = steps
 		self.detail = detail
-	
+
 	def withFirst(self, f):
 		if isinstance(f, Txn):
 			f = f.txid
@@ -61,7 +61,7 @@ class MerkleTree:
 		for s in steps:
 			f = dblsha(f + s)
 		return f
-	
+
 	def merkleRoot(self):
 		return self.withFirst(self.data[0])
 
@@ -80,7 +80,7 @@ def _test():
 		b'82293f182d5db07d08acf334a5a907012bbb9990851557ac0ec028116081bd5a' ==
 		b2a_hex(mt.withFirst(bytes.fromhex('d43b669fb42cfa84695b844c0402d410213faa4f3e66cb7248f688ff19d5e5f7')))
 	)
-	
+
 	d = b'\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00'
 	dh = b"C\xeczW\x9fUa\xa4*~\x967\xadAVg'5\xa6X\xbe'R\x18\x18\x01\xf7#\xba3\x16\xd2"
 	t = Txn(d)

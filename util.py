@@ -46,15 +46,15 @@ def target2bdiff(target):
 
 class shareLogFormatter:
 	_re_x = re.compile(r'^\s*(\w+)\s*(?:\(\s*(.*?)\s*\))?\s*$')
-	
+
 	def __init__(self, *a, **ka):
 		self._p = self.parse(*a, **ka)
-	
+
 	# NOTE: This only works for psf='%s' (default)
 	def formatShare(self, *a, **ka):
 		(stmt, params) = self.applyToShare(*a, **ka)
 		return stmt % params
-	
+
 	def applyToShare(self, share):
 		(stmt, stmtf) = self._p
 		params = []
@@ -62,12 +62,12 @@ class shareLogFormatter:
 			params.append(f(share))
 		params = tuple(params)
 		return (stmt, params)
-	
+
 	@classmethod
 	def parse(self, stmt, psf = '%s'):
 		fmt = string.Formatter()
 		pstmt = tuple(fmt.parse(stmt))
-		
+
 		stmt = ''
 		fmt = []
 		for (lit, field, fmtspec, conv) in pstmt:
@@ -79,7 +79,7 @@ class shareLogFormatter:
 			stmt += psf
 		fmt = tuple(fmt)
 		return (stmt, fmt)
-	
+
 	@classmethod
 	def get_field(self, field):
 		m = self._re_x.match(field)
@@ -97,19 +97,19 @@ class shareLogFormatter:
 				f = eval(fn)
 				return self._get_field_auto(f, sf)
 		raise ValueError('Failed to parse field: %s' % (field,))
-	
+
 	@classmethod
 	def _get_field_auto(self, f, subfunc):
 		return lambda s: f(subfunc(s))
-	
+
 	@classmethod
 	def get_field_not(self, subfunc):
 		return lambda s: not subfunc(s)
-	
+
 	@classmethod
 	def get_field_Q(self, subfunc):
 		return lambda s: subfunc(s) or '?'
-	
+
 	@classmethod
 	def get_field_dash(self, subfunc):
 		return lambda s: subfunc(s) or '-'
@@ -161,12 +161,12 @@ class ScheduleDict:
 	def __init__(self):
 		self._dict = {}
 		self._build_heap()
-	
+
 	def _build_heap(self):
 		newheap = list((v[0], id(o), o) for o, v in self._dict.items())
 		heapq.heapify(newheap)
 		self._heap = newheap
-	
+
 	def nextTime(self):
 		while True:
 			(t, k, o) = self._heap[0]
@@ -174,7 +174,7 @@ class ScheduleDict:
 				break
 			heapq.heappop(self._heap)
 		return t
-	
+
 	def shift(self):
 		while True:
 			(t, k, o) = heapq.heappop(self._heap)
@@ -182,7 +182,7 @@ class ScheduleDict:
 				break
 		del self._dict[o]
 		return o
-	
+
 	def __setitem__(self, o, t):
 		k = id(o)
 		self._dict[o] = (t, o)
@@ -190,18 +190,18 @@ class ScheduleDict:
 			self._build_heap()
 		else:
 			heapq.heappush(self._heap, (t, k, o))
-	
+
 	def __contains__(self, o):
 		return o in self._dict
-	
+
 	def __getitem__(self, o):
 		return self._dict[o][0]
-	
+
 	def __delitem__(self, o):
 		del self._dict[o]
 		if len(self._dict) < 2:
 			self._build_heap()
-	
+
 	def __len__(self):
 		return len(self._dict)
 
@@ -227,27 +227,27 @@ class _UniqueSessionIdManager:
 		self._defaultDelay = defaultDelay
 		self._schPut = ScheduleDict()
 		self._schPut_Lock = threading.Lock()
-	
+
 	def size(self):
 		return self._size
-	
+
 	def put(self, sid, delay = False, now = None):
 		if not delay:
 			return self._FreeIDs.append(sid)
-		
+
 		if delay is True:
 			delay = self._defaultDelay
 		if now is None:
 			now = time.time()
 		with self._schPut_Lock:
 			self._schPut[sid] = now + delay
-	
+
 	def get(self, desired = None, now = None):
 		try:
 			return self._FreeIDs.popleft()
 		except IndexError:
 			pass
-		
+
 		# Check delayed-free for one
 		if now is None:
 			now = time.time()
@@ -257,18 +257,18 @@ class _UniqueSessionIdManager:
 				while len(self._schPut) and self._schPut.nextTime() <= now:
 					self.put(self._schPut.shift())
 				return sid
-		
+
 		# If none free, make a new one
 		with self._NextID_Lock:
 			sid = self._NextID
 			self._NextID = sid + 1
 		if sid <= self._max:
 			return sid
-		
+
 		# TODO: Maybe steal an about-to-be-freed SID in the worst case scenario?
-		
+
 		raise IndexError('Ran out of session ids')
-	
+
 	# NOTE: Will steal a pending-free sid
 	def getSpecific(self, desired):
 		try:
@@ -276,13 +276,13 @@ class _UniqueSessionIdManager:
 			return desired
 		except ValueError:
 			pass
-		
+
 		# FIXME: relies on id(number) == id(number)
 		with self._schPut_Lock:
 			if desired in self._schPut:
 				del self._schPut[desired]
 				return desired
-		
+
 		# NOTE: Generated growth is limited to avoid memory exhaustion exploits
 		with self._NextID_Lock:
 			NextID = self._NextID
@@ -292,7 +292,7 @@ class _UniqueSessionIdManager:
 				for i in range(NextID, desired):
 					self.put(i)
 				return desired
-		
+
 		raise KeyError('Session id %u not available' % (desired,))
 
 UniqueSessionIdManager = _UniqueSessionIdManager()

@@ -33,7 +33,7 @@ class _getwork:
 		ShareTargetHex = '%064x' % (server.ShareTarget,)
 		ShareTargetHexLE = b2a_hex(bytes.fromhex(ShareTargetHex)[::-1]).decode('ascii')
 		JSONRPCHandler.getwork_rv_template['target'] = ShareTargetHexLE
-	
+
 	getwork_rv_template = {
 		'data': '000000800000000000000000000000000000000000000000000000000000000000000000000000000000000080020000',
 		'target': 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000',
@@ -45,7 +45,7 @@ class _getwork:
 			return self.doJSON_submitwork(data)
 		rv = dict(self.getwork_rv_template)
 		(hdr, x, target) = self.server.getBlockHeader(self.Username)
-		
+
 		# FIXME: this assumption breaks with internal rollntime
 		# NOTE: noncerange needs to set nonce to start value at least
 		global _CheckForDupesHACK
@@ -54,22 +54,22 @@ class _getwork:
 			_RealDupes[uhdr] = (_CheckForDupesHACK[uhdr], (hdr, x))
 			raise self.server.RaiseRedFlags(RuntimeError('issuing duplicate work'))
 		_CheckForDupesHACK[uhdr] = (hdr, x)
-		
+
 		data = b2a_hex(swap32(hdr)).decode('utf8') + rv['data']
 		# TODO: endian shuffle etc
 		rv['data'] = data
 		if midstate and 'midstate' not in self.extensions and 'midstate' not in self.quirks:
 			h = midstate.SHA256(hdr)[:8]
 			rv['midstate'] = b2a_hex(pack('<LLLLLLLL', *h)).decode('ascii')
-		
+
 		ShareTargetHex = '%064x' % (target,)
 		ShareTargetHexLE = b2a_hex(bytes.fromhex(ShareTargetHex)[::-1]).decode('ascii')
 		rv['target'] = ShareTargetHexLE
-		
+
 		self._JSONHeaders['X-Roll-NTime'] = 'expire=120'
-		
+
 		return rv
-	
+
 	def doJSON_submitwork(self, datax):
 		data = swap32(bytes.fromhex(datax))[:80]
 		share = {

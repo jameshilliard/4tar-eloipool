@@ -43,7 +43,7 @@ StratumCodes = {
 
 class StratumHandler(networkserver.SocketHandler):
 	logger = logging.getLogger('StratumHandler')
-	
+
 	def __init__(self, *a, **ka):
 		super().__init__(*a, **ka)
 		self.remoteHost = self.addr[0]
@@ -55,17 +55,17 @@ class StratumHandler(networkserver.SocketHandler):
 		self.JobTargets = collections.OrderedDict()
 		self.UA = None
 		self.LicenseSent = agplcompliance._SourceFiles is None
-	
+
 	def sendReply(self, ob):
 		return self.push(json.dumps(ob).encode('ascii') + b"\n")
-	
+
 	def found_terminator(self):
 		inbuf = b"".join(self.incoming).decode('ascii')
 		self.incoming = []
-		
+
 		if not inbuf:
 			return
-		
+
 		try:
 			rpc = json.loads(inbuf)
 		except ValueError:
@@ -89,7 +89,7 @@ class StratumHandler(networkserver.SocketHandler):
 				'result': None,
 			})
 			return
-		
+
 		try:
 			rv = getattr(self, funcname)(*rpc['params'])
 		except StratumError as e:
@@ -109,16 +109,16 @@ class StratumHandler(networkserver.SocketHandler):
 			if not hasattr(e, 'StratumQuiet'):
 				self.logger.debug(fexc)
 			return
-		
+
 		if rpc['id'] is None:
 			return
-		
+
 		self.sendReply({
 			'error': None,
 			'id': rpc['id'],
 			'result': rv,
 		})
-	
+
 	def sendLicenseNotice(self):
 		if self.fd == -1:
 			return
@@ -129,7 +129,7 @@ class StratumHandler(networkserver.SocketHandler):
 				'params': ('This stratum server is licensed under the GNU Affero General Public License, version 3. You may download source code over stratum using the server.get_source method.',),
 			})
 		self.LicenseSent = True
-	
+
 	def sendJob(self):
 		target = self.server.defaultTarget
 		if len(self.Usernames) == 1:
@@ -150,17 +150,17 @@ class StratumHandler(networkserver.SocketHandler):
 		if len(self.JobTargets) > 4:
 			self.JobTargets.popitem(False)
 		self.JobTargets[self.server.JobId] = target
-	
+
 	def requestStratumUA(self):
 		self.sendReply({
 			'id': 7,
 			'method': 'client.get_version',
 			'params': (),
 		})
-	
+
 	def _stratumreply_7(self, rpc):
 		self.UA = rpc.get('result') or rpc
-	
+
 	def _stratum_mining_subscribe(self, UA = None, xid = None):
 		if not UA is None:
 			self.UA = UA
@@ -182,7 +182,7 @@ class StratumHandler(networkserver.SocketHandler):
 			xid,
 			4,
 		]
-	
+
 	def close(self):
 		if hasattr(self, '_sid'):
 			UniqueSessionIdManager.put(self._sid)
@@ -192,7 +192,7 @@ class StratumHandler(networkserver.SocketHandler):
 		except:
 			pass
 		super().close()
-	
+
 	def _stratum_mining_submit(self, username, jobid, extranonce2, ntime, nonce):
 		if username not in self.Usernames:
 			raise StratumError(24, 'unauthorized-user', False)
@@ -216,7 +216,7 @@ class StratumHandler(networkserver.SocketHandler):
 			errno = StratumCodes.get(rej, 20)
 			raise StratumError(errno, rej, False)
 		return True
-	
+
 	def _stratum_mining_authorize(self, username, password = None):
 		try:
 			valid = self.server.checkAuthentication(username, password)
@@ -226,7 +226,7 @@ class StratumHandler(networkserver.SocketHandler):
 			self.Usernames[username] = None
 			self.changeTask(self.requestStratumUA, 0)
 		return valid
-	
+
 	def _stratum_mining_get_transactions(self, jobid):
 		try:
 			(MC, wld) = self.server.getExistingStratumJob(jobid)
@@ -235,7 +235,7 @@ class StratumHandler(networkserver.SocketHandler):
 			raise
 		(height, merkleTree, cb, prevBlock, bits) = MC[:5]
 		return list(b2a_hex(txn.data).decode('ascii') for txn in merkleTree.data[1:])
-	
+
 	def _stratum_server_get_source(self, path = ''):
 		s = agplcompliance.get_source(path.encode('utf8'))
 		if s:
@@ -245,32 +245,32 @@ class StratumHandler(networkserver.SocketHandler):
 
 class StratumServer(networkserver.AsyncSocketServer):
 	logger = logging.getLogger('StratumServer')
-	
+
 	waker = True
 	schMT = True
-	
+
 	extranonce1null = struct.pack('=I', 0)  # NOTE: Assumes sessionids are 4 bytes
-	
+
 	def __init__(self, *a, **ka):
 		ka.setdefault('RequestHandlerClass', StratumHandler)
 		super().__init__(*a, **ka)
-		
+
 		self._Clients = {}
 		self._JobId = 0
 		self.JobId = '%d' % (time(),)
 		self.WakeRequest = None
 		self.UpdateTask = None
 		self._PendingQuickUpdates = set()
-	
+
 	def checkAuthentication(self, username, password):
 		return True
-	
+
 	def updateJobOnly(self, wantClear = False, forceClean = False):
 		self._JobId += 1
 		JobId = '%d %d' % (time(), self._JobId)
 		(MC, wld) = self.getStratumJob(JobId, wantClear=wantClear)
 		(height, merkleTree, cb, prevBlock, bits) = MC[:5]
-		
+
 		if len(cb) > 96 - len(self.extranonce1null) - 4:
 			if not self.rejecting:
 				self.logger.warning('Coinbase too big for stratum: disabling')
@@ -281,15 +281,15 @@ class StratumServer(networkserver.AsyncSocketServer):
 		elif self.rejecting:
 			self.rejecting = False
 			self.logger.info('Coinbase small enough for stratum again: reenabling')
-		
+
 		txn = deepcopy(merkleTree.data[0])
 		cb += self.extranonce1null + b'Eloi'
 		txn.setCoinbase(cb)
 		txn.assemble()
 		pos = txn.data.index(cb) + len(cb)
-		
+
 		steps = list(b2a_hex(h).decode('ascii') for h in merkleTree._steps)
-		
+
 		self.JobBytes = json.dumps({
 			'id': None,
 			'method': 'mining.notify',
@@ -306,21 +306,21 @@ class StratumServer(networkserver.AsyncSocketServer):
 			],
 		}).encode('ascii') + b"\n"
 		self.JobId = JobId
-		
+
 	def updateJob(self, wantClear = False):
 		if self.UpdateTask:
 			try:
 				self.rmSchedule(self.UpdateTask)
 			except:
 				pass
-		
+
 		self.updateJobOnly(wantClear=wantClear)
-		
+
 		self.WakeRequest = 1
 		self.wakeup()
-		
+
 		self.UpdateTask = self.schedule(self.updateJob, time() + 55)
-	
+
 	def doQuickUpdate(self):
 		PQU = self._PendingQuickUpdates
 		self._PendingQuickUpdates = set()
@@ -339,15 +339,15 @@ class StratumServer(networkserver.AsyncSocketServer):
 					self.logger.debug('Error sending quickupdate job:\n' + traceback.format_exc())
 		if QUC:
 			self.logger.debug("Quickupdated %d clients" % (QUC,))
-	
+
 	def quickDifficultyUpdate(self, username):
 		self._PendingQuickUpdates.add(username)
 		self.schedule(self.doQuickUpdate, time())
-	
+
 	def pre_schedule(self):
 		if self.WakeRequest:
 			self._wakeNodes()
-	
+
 	def _wakeNodes(self):
 		self.WakeRequest = None
 		C = self._Clients
@@ -356,9 +356,9 @@ class StratumServer(networkserver.AsyncSocketServer):
 			return
 		OC = len(C)
 		self.logger.debug("%d clients to wake up..." % (OC,))
-		
+
 		now = time()
-		
+
 		for ic in list(C.values()):
 			try:
 				ic.sendJob()
@@ -368,8 +368,8 @@ class StratumServer(networkserver.AsyncSocketServer):
 			except:
 				OC -= 1
 				self.logger.debug('Error sending new job:\n' + traceback.format_exc())
-		
+
 		self.logger.debug('New job sent to %d clients in %.3f seconds' % (OC, time() - now))
-	
+
 	def getTarget(*a, **ka):
 		return None

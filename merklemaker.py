@@ -65,7 +65,7 @@ class merkleMaker(threading.Thread):
 		'capabilities': GBTCaps,
 		'tx': 'obj',
 	}
-	
+
 	def __init__(self, *a, **k):
 		super().__init__(*a, **k)
 		self.daemon = True
@@ -82,7 +82,7 @@ class merkleMaker(threading.Thread):
 		self.currentBlock = (None, None, None)
 		self.lastBlock = (None, None, None)
 		self.SubsidyAlgo = lambda height: 5000000000 >> (height // 210000)
-	
+
 	def _prepare(self):
 		self.TemplateSources = list(getattr(self, 'TemplateSources', ()))
 		self.TemplateChecks = list(getattr(self, 'TemplateChecks', ()))
@@ -132,37 +132,37 @@ class merkleMaker(threading.Thread):
 			BS = self.BlockSubmissions[i]
 			URINamePair(BS, 'BlockSubmissions[%u]' % (i,))
 			BS['access'] = URI2Access(BS['uri'])
-		
+
 		self.ready = False
 		self.readyCV = threading.Condition()
-		
+
 		self.currentMerkleTree = None
 		self.merkleRoots = deque(maxlen=self.WorkQueueSizeRegular[1])
 		self.LowestMerkleRoots = self.WorkQueueSizeRegular[1]
-		
+
 		if not hasattr(self, 'WorkQueueSizeClear'):
 			self.WorkQueueSizeClear = self.WorkQueueSizeLongpoll
 		self._MaxClearSize = max(self.WorkQueueSizeClear[1], self.WorkQueueSizeLongpoll[1])
 		self.clearMerkleRoots = Queue(self._MaxClearSize)
 		self.LowestClearMerkleRoots = self.WorkQueueSizeClear[1]
 		self.nextMerkleRoots = Queue(self._MaxClearSize)
-		
+
 		if not hasattr(self, 'WarningDelay'):
 			self.WarningDelay = max(15, self.MinimumTxnUpdateWait * 2)
 		if not hasattr(self, 'WarningDelayTxnLongpoll'):
 			self.WarningDelayTxnLongpoll = self.WarningDelay
 		if not hasattr(self, 'WarningDelayMerkleUpdate'):
 			self.WarningDelayMerkleUpdate = self.WarningDelay
-		
+
 		self.lastMerkleUpdate = 0
 		self.nextMerkleUpdate = 0
-	
+
 	def createClearMerkleTree(self, height):
 		subsidy = self.SubsidyAlgo(height)
 		cbtxn = self.makeCoinbaseTxn(subsidy, False)
 		cbtxn.assemble()
 		return MerkleTree([cbtxn])
-	
+
 	def updateBlock(self, newBlock, height = None, bits = None, _HBH = None):
 		if newBlock == self.currentBlock[0]:
 			if height in (None, self.currentBlock[1]) and bits in (None, self.currentBlock[2]):
@@ -178,11 +178,11 @@ class merkleMaker(threading.Thread):
 				if self.needMerkle == 1:
 					self.needMerkle = False
 				self.onBlockUpdate()
-		
+
 		# Old block is invalid
 		if self.currentBlock[0] != newBlock:
 			self.lastBlock = self.currentBlock
-		
+
 		lastHeight = self.currentBlock[1]
 		if height is None:
 			height = self.currentBlock[1] + 1
@@ -200,12 +200,12 @@ class merkleMaker(threading.Thread):
 				return
 			else:
 				bits = self.currentBlock[2]
-		
+
 		if _HBH is None:
 			_HBH = (b2a_hex(newBlock[::-1]).decode('utf8'), b2a_hex(bits[::-1]).decode('utf8'))
 		self.logger.info('New block: %s (height: %d; bits: %s)' % (_HBH[0], height, _HBH[1]))
 		self.currentBlock = (newBlock, height, bits)
-		
+
 		if lastHeight != height:
 			# TODO: Perhaps reuse clear merkle trees more intelligently
 			OCMR = self.clearMerkleRoots
@@ -226,15 +226,15 @@ class merkleMaker(threading.Thread):
 			self.logger.debug('Already using clear merkleroots for this height')
 		self.currentMerkleTree = self.curClearMerkleTree
 		self.merkleRoots.clear()
-		
+
 		if not self.ready:
 			self.ready = True
 			with self.readyCV:
 				self.readyCV.notify_all()
-		
+
 		self.needMerkle = 2
 		self.onBlockChange()
-	
+
 	def _trimBlock(self, MP, txnlist, txninfo, floodn, msgf):
 		fee = txninfo[-1].get('fee', None)
 		if fee is None:
@@ -242,12 +242,12 @@ class merkleMaker(threading.Thread):
 		if fee:
 			# FIXME: coinbasevalue is *not* guaranteed to exist here
 			MP['coinbasevalue'] -= fee
-		
+
 		txnlist[-1:] = ()
 		txninfo[-1:] = ()
-		
+
 		return True
-	
+
 	# Aggressive "Power Of Two": Remove transactions even with fees to reach our goal
 	def _APOT(self, txninfopot, MP, POTInfo):
 		feeTxnsTrimmed = 0
@@ -261,26 +261,26 @@ class merkleMaker(threading.Thread):
 			feesTrimmed += txn['fee']
 			feeTxnsTrimmed += 1
 		MP['coinbasevalue'] -= feesTrimmed
-		
+
 		POTInfo[2] = [feeTxnsTrimmed, feesTrimmed]
 		self._floodWarning(now, 'POT-Trimming-Fees', doin='Aggressive POT trimming %d transactions with %d.%08d BTC total fees' % (feeTxnsTrimmed, feesTrimmed//100000000, feesTrimmed % 100000000), logf=self.logger.debug)
-		
+
 		return True
-	
+
 	def _makeBlockSafe(self, MP, txnlist, txninfo):
 		blocksize = sum(map(len, txnlist)) + 80
 		while blocksize > 934464:  # 1 "MB" limit - 64 KB breathing room
 			txnsize = len(txnlist[-1])
 			self._trimBlock(MP, txnlist, txninfo, 'SizeLimit', lambda x: 'Making blocks over 1 MB size limit (%d bytes; %s)' % (blocksize, x))
 			blocksize -= txnsize
-		
+
 		# NOTE: This check doesn't work at all without BIP22 transaction obj format
 		blocksigops = sum(a.get('sigops', 0) for a in txninfo)
 		while blocksigops > 19488:  # 20k limit - 0x200 breathing room
 			txnsigops = txninfo[-1]['sigops']
 			self._trimBlock(MP, txnlist, txninfo, 'SigOpLimit', lambda x: 'Making blocks over 20k SigOp limit (%d; %s)' % (blocksigops, x))
 			blocksigops -= txnsigops
-		
+
 		# Aim to produce blocks with "Power Of Two" transaction counts
 		# This helps avoid any chance of someone abusing CVE-2012-2459 with them
 		POTMode = getattr(self, 'POT', 1)
@@ -291,14 +291,14 @@ class merkleMaker(threading.Thread):
 				if 'fee' not in txninfo[i] or txninfo[i]['fee']:
 					break
 				feetxncount -= 1
-			
+
 			if getattr(self, 'Greedy', None):
 				# Aim to cut off extra zero-fee transactions on the end
 				# NOTE: not cutting out ones intermixed, in case of dependencies
 				idealtxncount = feetxncount
 			else:
 				idealtxncount = txncount
-			
+
 			pot = 2**int(log(idealtxncount, 2))
 			POTInfo = MP['POTInfo'] = [[idealtxncount, feetxncount, txncount], [pot, None], None]
 			if pot < idealtxncount:
@@ -319,7 +319,7 @@ class merkleMaker(threading.Thread):
 			pot -= 1
 			txnlist[pot:] = ()
 			txninfo[pot:] = ()
-	
+
 	def _CallGBT(self, TS):
 		access = TS['access']
 		self.logger.debug('Requesting new template from \'%s\'' % (TS['name'],))
@@ -340,18 +340,18 @@ class merkleMaker(threading.Thread):
 			if MP is False:
 				# This way, we get the error from the BIP22 call if the old one fails too
 				raise
-			
+
 			# Pre-BIP22 server (bitcoind <0.7 or Eloipool <20120513)
 			if not access.OldGMP:
 				access.OldGMP = True
 				self.logger.warning('Upstream \'%s\' is not BIP 22 compatible' % (TS['name'],))
-		
+
 		return MP
-	
+
 	def _ProcessGBT(self, MP, TS = None):
 		oMP = MP
 		MP = deepcopy(MP)
-		
+
 		prevBlock = bytes.fromhex(MP['previousblockhash'])[::-1]
 		if 'height' not in MP:
 			MP['height'] = TS['access'].getinfo()['blocks'] + 1
@@ -360,7 +360,7 @@ class merkleMaker(threading.Thread):
 		(MP['_bits'], MP['_prevBlock']) = (bits, prevBlock)
 		if (prevBlock, height, bits) != self.currentBlock and (self.currentBlock[1] is None or height > self.currentBlock[1]):
 			self.updateBlock(prevBlock, height, bits, _HBH=(MP['previousblockhash'], MP['bits']))
-		
+
 		txnlist = MP['transactions']
 		if len(txnlist) and isinstance(txnlist[0], dict):
 			txninfo = txnlist
@@ -373,16 +373,16 @@ class merkleMaker(threading.Thread):
 			txninfo = [{}] * len(txnlist)
 		# TODO: cache Txn or at least txid from previous merkle roots?
 		txnlist = [a for a in map(bytes.fromhex, txnlist)]
-		
+
 		self._makeBlockSafe(MP, txnlist, txninfo)
-		
+
 		cbtxn = self.makeCoinbaseTxn(MP['coinbasevalue'], prevBlockHex = MP['previousblockhash'])
 		cbtxn.setCoinbase(b'\0\0')
 		cbtxn.assemble()
 		txnlist.insert(0, cbtxn.data)
 		txninfo.insert(0, {
 		})
-		
+
 		txnlist = [a for a in map(Txn, txnlist[1:])]
 		txnlist.insert(0, cbtxn)
 		txnlist = list(txnlist)
@@ -390,9 +390,9 @@ class merkleMaker(threading.Thread):
 		newMerkleTree.POTInfo = MP.get('POTInfo')
 		newMerkleTree.MP = MP
 		newMerkleTree.oMP = oMP
-		
+
 		return newMerkleTree
-	
+
 	def _CheckTemplate(self, newMerkleTree, TS):
 		TCList = self.TemplateChecks
 		if not TCList:
@@ -406,12 +406,12 @@ class merkleMaker(threading.Thread):
 					'weight': 1,
 				},
 			)
-		
+
 		MP = newMerkleTree.MP
 		(prevBlock, height, bits) = (MP['_prevBlock'], MP['height'], MP['_bits'])
 		txnlist = newMerkleTree.data
 		cbtxn = txnlist[0]
-		
+
 		coinbase = self.makeCoinbase(height=height)
 		cbtxn.setCoinbase(coinbase)
 		cbtxn.assemble()
@@ -423,7 +423,7 @@ class merkleMaker(threading.Thread):
 			"mode": "proposal",
 			"data": b2a_hex(data).decode('utf8'),
 		}
-		
+
 		AcceptedScore = 0
 		RejectedScore = 0
 		Rejections = {}
@@ -450,7 +450,7 @@ class merkleMaker(threading.Thread):
 				except:
 					pass
 				self.logger.error('Upstream \'%s\' rejected proposed block from \'%s\': %s' % (TC['name'], TS['name'], propose))
-		
+
 		if Rejections:
 			RPInfo = {
 				'merkleTree': newMerkleTree,
@@ -460,7 +460,7 @@ class merkleMaker(threading.Thread):
 				'ProposalErrors': ProposalErrors,
 			}
 			self.RejectedProposal = RPInfo
-			
+
 			try:
 				global _filecounter
 				_filecounter += 1
@@ -469,38 +469,38 @@ class merkleMaker(threading.Thread):
 					pickle.dump(RPInfo, f)
 			except IOError:
 				pass
-		
+
 		TotalScore = AcceptedScore + RejectedScore
-		
+
 		return (AcceptedScore, TotalScore)
-	
+
 	def _updateMerkleTree_fromTS(self, TS):
 		MP = self._CallGBT(TS)
 		newMerkleTree = self._ProcessGBT(MP, TS)
-		
+
 		# Some versions of bitcoinrpc ServiceProxy have problems copying/pickling, so just store name and URI for now
 		newMerkleTree.source = TS['name']
 		newMerkleTree.source_uri = TS['uri']
-		
+
 		(AcceptedScore, TotalScore) = self._CheckTemplate(newMerkleTree, TS)
 		if TotalScore is None:
 			return (0, newMerkleTree)
-		
+
 		if TotalScore:
 			AcceptRatio = AcceptedScore / TotalScore
 		else:
 			AcceptRatio = 0.0
-		
+
 		self.logger.debug('Template from \'%s\' has %s acceptance ratio and score of %s' % (TS['name'], AcceptRatio, AcceptedScore))
-		
+
 		if AcceptRatio <= self.MinimumTemplateAcceptanceRatio:
 			return None
-		
+
 		if TotalScore < self.MinimumTemplateScore:
 			return None
-		
+
 		return (AcceptRatio, newMerkleTree)
-	
+
 	def _updateMerkleTree_I(self):
 		Best = (-1, None)
 		for TSPriList in self.TemplateSources:
@@ -508,18 +508,18 @@ class merkleMaker(threading.Thread):
 			for i in range(len(TSPriList)):
 				TS = TSPriList.pop(0)
 				TSPriList.append(TS)
-				
+
 				try:
 					r = self._updateMerkleTree_fromTS(TS)
 					if r is None:
 						# Failed completely
 						continue
-					
+
 					(AcceptRatio, newMerkleTree) = r
-					
+
 					# NOTE: If you're going to try to remove this preference for the highest block, you need to (at least) stop _ProcessGBT from calling updateBlock whenever it sees a new high
 					AcceptRatio += newMerkleTree.MP['height']
-					
+
 					self.logger.debug('Template from \'%s\' has %s acceptance ratio at height %s' % (TS['name'], AcceptRatio, newMerkleTree.MP['height']))
 					if Best[0] < AcceptRatio:
 						Best = (AcceptRatio, newMerkleTree)
@@ -530,37 +530,37 @@ class merkleMaker(threading.Thread):
 						raise
 					else:
 						self.logger.error(traceback.format_exc())
-		
+
 		BestMT = Best[1]
 		if BestMT is None:
 			raise RuntimeError('Failed to create usable template')
-		
+
 		self.logger.debug('Updating merkle tree with template from \'%s\'' % (BestMT.source,))
 		MP = BestMT.MP
 		blkbasics = (MP['_prevBlock'], MP['height'], MP['_bits'])
 		if blkbasics != self.currentBlock:
 			self.updateBlock(*blkbasics, _HBH=(MP['previousblockhash'], MP['bits']))
 		self.currentMerkleTree = BestMT
-	
+
 	def _updateMerkleTree(self):
 		global now
 		self.logger.debug('Polling for new block template')
 		self.nextMerkleUpdate = now + self.TxnUpdateRetryWait
-		
+
 		self._updateMerkleTree_I()
-		
+
 		self.lastMerkleUpdate = now
 		self.nextMerkleUpdate = now + self.MinimumTxnUpdateWait
-		
+
 		if self.needMerkle == 2:
 			self.needMerkle = 1
 			self.needMerkleSince = now
-	
+
 	def updateMerkleTree(self):
 		global now
 		now = time()
 		self._updateMerkleTree()
-	
+
 	def makeCoinbase(self, height):
 		now = int(time())
 		if now > _makeCoinbase[0]:
@@ -585,7 +585,7 @@ class merkleMaker(threading.Thread):
 			self.isOverflowed = False
 		rv = bitcoin.script.encodeUNum(height) + rv
 		return rv
-	
+
 	def makeMerkleRoot(self, merkleTree, height):
 		cbtxn = merkleTree.data[0]
 		cb = self.makeCoinbase(height=height)
@@ -593,7 +593,7 @@ class merkleMaker(threading.Thread):
 		cbtxn.assemble()
 		merkleRoot = merkleTree.merkleRoot()
 		return (merkleRoot, merkleTree, cb)
-	
+
 	_doing_last = None
 	def _doing(self, what):
 		if self._doing_last == what:
@@ -605,7 +605,7 @@ class merkleMaker(threading.Thread):
 		self._doing_last = what
 		self._doing_i = 1
 		self._doing_s = now
-	
+
 	def _floodWarning(self, now, wid, wmsgf = None, doin = True, logf = None):
 		if doin is True:
 			doin = self._doing_last
@@ -622,33 +622,33 @@ class merkleMaker(threading.Thread):
 		if logf is None:
 			logf = self.logger.warning
 		logf(wmsgf() if wmsgf else doin)
-	
+
 	def _makeOne(self, putf, merkleTree, height):
 		MakingAtThisHeight = self.currentBlock[1]
 		MR = self.makeMerkleRoot(merkleTree, height=height)
 		# Only add it if the height hasn't changed in the meantime, to avoid a race
 		if self.currentBlock[1] == MakingAtThisHeight:
 			putf(MR)
-	
+
 	def makeClear(self):
 		self._doing('clear merkle roots')
 		self._makeOne(self.clearMerkleRoots.put, self.curClearMerkleTree, height=self.currentBlock[1])
-	
+
 	def makeNext(self):
 		self._doing('longpoll merkle roots')
 		self._makeOne(self.nextMerkleRoots.put, self.nextMerkleTree, height=self.currentBlock[1] + 1)
-	
+
 	def makeRegular(self):
 		self._doing('regular merkle roots')
 		self._makeOne(self.merkleRoots.append, self.currentMerkleTree, height=self.currentBlock[1])
-	
+
 	def merkleMaker_II(self):
 		global now
-		
+
 		# No bits = no mining :(
 		if not self.ready:
 			return self._updateMerkleTree()
-		
+
 		# First, ensure we have the minimum clear, next, and regular (in that order)
 		if self.clearMerkleRoots.qsize() < self.WorkQueueSizeClear[0]:
 			return self.makeClear()
@@ -656,11 +656,11 @@ class merkleMaker(threading.Thread):
 			return self.makeNext()
 		if len(self.merkleRoots) < self.WorkQueueSizeRegular[0]:
 			return self.makeRegular()
-		
+
 		# If we've met the minimum requirements, consider updating the merkle tree
 		if self.nextMerkleUpdate <= now:
 			return self._updateMerkleTree()
-		
+
 		# Finally, fill up clear, next, and regular until we've met the maximums
 		if self.clearMerkleRoots.qsize() < self.WorkQueueSizeClear[1]:
 			return self.makeClear()
@@ -668,7 +668,7 @@ class merkleMaker(threading.Thread):
 			return self.makeNext()
 		if len(self.merkleRoots) < self.WorkQueueSizeRegular[1] or self.merkleRoots[0][1] != self.currentMerkleTree:
 			return self.makeRegular()
-		
+
 		# Nothing left to do, fire onBlockUpdate event (if appropriate) and sleep
 		if self.needMerkle == 1:
 			self.onBlockUpdate()
@@ -676,29 +676,29 @@ class merkleMaker(threading.Thread):
 		self._doing('idle')
 		# TODO: rather than sleepspin, block until MinimumTxnUpdateWait expires or threading.Condition(?)
 		sleep(self.IdleSleepTime)
-	
+
 	def merkleMaker_I(self):
 		global now
 		now = time()
-		
+
 		self.merkleMaker_II()
-		
+
 		if self.needMerkle == 1 and now > self.needMerkleSince + self.WarningDelayTxnLongpoll:
 			self._floodWarning(now, 'NeedMerkle', lambda: 'Transaction-longpoll requested %d seconds ago, and still not ready. Is your server fast enough to keep up with your configured WorkQueueSizeRegular maximum?' % (now - self.needMerkleSince,))
 		if now > self.nextMerkleUpdate + self.WarningDelayMerkleUpdate:
 			self._floodWarning(now, 'MerkleUpdate', lambda: "Haven't updated the merkle tree in at least %d seconds! Is your server fast enough to keep up with your configured work queue minimums?" % (now - self.lastMerkleUpdate,))
-	
+
 	def run(self):
 		while True:
 			try:
 				self.merkleMaker_I()
 			except:
 				self.logger.critical(traceback.format_exc())
-	
+
 	def start(self, *a, **k):
 		self._prepare()
 		super().start(*a, **k)
-	
+
 	def getMRD(self):
 		try:
 			MRD = self.merkleRoots.pop()
@@ -716,7 +716,7 @@ class merkleMaker(threading.Thread):
 		(merkleRoot, merkleTree, cb) = MRD
 		(prevBlock, height, bits) = self.currentBlock
 		return (merkleRoot, merkleTree, cb, prevBlock, bits, rollPrevBlk)
-	
+
 	def getMC(self, wantClear = False):
 		if not self.ready:
 			with self.readyCV:
@@ -747,7 +747,7 @@ def _test():
 	MM.logger = fakelogger()
 	class NMTClass:
 		pass
-	
+
 	# _makeBlockSafe tests
 	from copy import deepcopy
 	MP = {

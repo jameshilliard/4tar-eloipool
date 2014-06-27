@@ -37,16 +37,16 @@ class logfile(threading.Thread):
 		self.fmt = shareLogFormatter(ka['format'], '%s')
 		self.queue = deque()
 		self.start()
-	
+
 	def queueshare(self, line):
 		self.queue.append(line)
-	
+
 	def flushlog(self):
 		if len(self.queue) > 0:
 			with open(self.fn, "a") as logfile:
 				while len(self.queue)>0:
 					logfile.write(self.queue.popleft())
-	
+
 	def run(self):
 		while True:
 			try:
@@ -54,7 +54,7 @@ class logfile(threading.Thread):
 				self.flushlog()
 			except:
 				_logger.critical(traceback.format_exc())
-	
+
 	def logShare(self, share):
 		logline = self.fmt.formatShare(share)
 		self.queueshare(logline)

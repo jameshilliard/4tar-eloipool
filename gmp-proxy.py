@@ -54,7 +54,7 @@ def getMRD():
 	else:
 		MRD = currentwork[0]
 		currentwork[2] += 1
-	
+
 	(merkleRoot, merkleTree, coinbase, prevBlock, bits, rollPrevBlk, mp) = MRD
 	cbtxn = merkleTree.data[0]
 	coinbase = cbtxn.originalCB + pack('>Q', currentwork[2]).lstrip(b'\0')
@@ -101,7 +101,7 @@ def SubmitShare(share):
 
 def HandleLP():
 	global server
-	
+
 	# FIXME: get path from gmp!
 	pool = jsonrpc.ServiceProxy(sys.argv[1].rstrip('/') + '/LP')
 	while True:

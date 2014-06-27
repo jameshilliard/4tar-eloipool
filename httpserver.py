@@ -49,11 +49,11 @@ class HTTPHandler(networkserver.SocketHandler):
 		405: 'Method Not Allowed',
 		500: 'Internal Server Error',
 	}
-	
+
 	logger = logging.getLogger('HTTPHandler')
-	
+
 	default_quirks = {}
-	
+
 	def sendReply(self, status=200, body=b'', headers=None, tryCompression=True):
 		if self.replySent:
 			raise RequestAlreadyHandled
@@ -86,19 +86,19 @@ class HTTPHandler(networkserver.SocketHandler):
 		buf += body
 		self.push(buf)
 		raise RequestHandled
-	
+
 	def doError(self, reason = '', code = 100, headers = None):
 		if headers is None: headers = {}
 		headers.setdefault('Content-Type', 'text/plain')
 		return self.sendReply(500, reason.encode('utf8'), headers)
-	
+
 	def doHeader_accept_encoding(self, value):
 		if b'gzip' in value:
 			self.quirks['gzip'] = True
-	
+
 	def checkAuthentication(self, *a, **ka):
 		return self.server.checkAuthentication(*a, **ka)
-	
+
 	def doHeader_authorization(self, value):
 		value = value.split(b' ')
 		if len(value) != 2 or value[0] != b'Basic':
@@ -112,23 +112,23 @@ class HTTPHandler(networkserver.SocketHandler):
 			return self.doError('Error checking authorization')
 		if valid:
 			self.Username = un.decode('utf8')
-	
+
 	def doHeader_connection(self, value):
 		if value == b'close':
 			self.quirks['close'] = None
-	
+
 	def doHeader_content_length(self, value):
 		self.CL = int(value)
-	
+
 	def doHeader_x_forwarded_for(self, value):
 		if self.addr[0] in self.server.TrustedForwarders:
 			self.remoteHost = value.decode('ascii')
 		else:
 			self.logger.debug("Ignoring X-Forwarded-For header from %s" % (self.addr[0],))
-	
+
 	def doAuthenticate(self):
 		self.sendReply(401, headers={'WWW-Authenticate': 'Basic realm="%s"' % (self.server.ServerName,)})
-	
+
 	def parse_headers(self, hs):
 		self.CL = None
 		self.Username = None
@@ -160,7 +160,7 @@ class HTTPHandler(networkserver.SocketHandler):
 				except RequestAlreadyHandled:
 					# Ignore multiple errors and such
 					pass
-	
+
 	def found_terminator(self):
 		if self.reading_headers:
 			inbuf = b"".join(self.incoming)
@@ -170,13 +170,13 @@ class HTTPHandler(networkserver.SocketHandler):
 				inbuf = inbuf[len(m.group(0)):]
 			if not inbuf:
 				return
-			
+
 			self.reading_headers = False
 			self.parse_headers(inbuf)
 			if self.CL:
 				self.set_terminator(self.CL)
 				return
-		
+
 		self.set_terminator(None)
 		try:
 			self.handle_request()
@@ -187,7 +187,7 @@ class HTTPHandler(networkserver.SocketHandler):
 			pass
 		except:
 			self.logger.error(traceback.format_exc())
-	
+
 	def handle_src_request(self):
 		# For AGPL compliance, allow direct downloads of source code
 		p = self.path[5:]
@@ -196,7 +196,7 @@ class HTTPHandler(networkserver.SocketHandler):
 			return self.sendReply(404)
 		(ct, body) = s
 		return self.sendReply(body=body, headers={'Content-Type':ct})
-	
+
 	def reset_request(self):
 		self.replySent = False
 		self.incoming = []
@@ -207,12 +207,12 @@ class HTTPHandler(networkserver.SocketHandler):
 			self.close()
 		# proxies can do multiple requests in one connection for multiple clients, so reset address every time
 		self.remoteHost = self.addr[0]
-	
+
 	def __init__(self, *a, **ka):
 		super().__init__(*a, **ka)
 		self.quirks = dict(self.default_quirks)
 		self.reset_request()
-	
+
 setattr(HTTPHandler, 'doHeader_accept-encoding', HTTPHandler.doHeader_accept_encoding);
 setattr(HTTPHandler, 'doHeader_content-length', HTTPHandler.doHeader_content_length);
 setattr(HTTPHandler, 'doHeader_x-forwarded-for', HTTPHandler.doHeader_x_forwarded_for);

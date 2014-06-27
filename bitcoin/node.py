@@ -36,7 +36,7 @@ def makeNetAddr(addr):
 
 class BitcoinLink(networkserver.SocketHandler):
 	logger = logging.getLogger('BitcoinLink')
-	
+
 	def __init__(self, *a, **ka):
 		dest = ka.pop('dest', None)
 		if dest:
@@ -56,7 +56,7 @@ class BitcoinLink(networkserver.SocketHandler):
 		self.changeTask(None)  # FIXME: TEMPORARY
 		if dest:
 			self.pushVersion()
-	
+
 	def handle_readbuf(self):
 		netid = self.server.netid
 		while self.ac_in_buffer:
@@ -70,7 +70,7 @@ class BitcoinLink(networkserver.SocketHandler):
 						self.ac_in_buffer = b''
 					break
 				self.ac_in_buffer = self.ac_in_buffer[p:]
-			
+
 			cmd = self.ac_in_buffer[4:0x10].rstrip(b'\0').decode('utf8')
 			payloadLen = unpack('<L', self.ac_in_buffer[0x10:0x14])[0]
 			if payloadLen > MAX_PACKET_PAYLOAD:
@@ -79,23 +79,23 @@ class BitcoinLink(networkserver.SocketHandler):
 			if len(self.ac_in_buffer) < payloadEnd:
 				# Don't have the whole packet yet
 				break
-			
+
 			method = 'doCmd_' + cmd
 			cksum = self.ac_in_buffer[0x14:0x18]
 			payload = self.ac_in_buffer[0x18:payloadEnd]
 			self.ac_in_buffer = self.ac_in_buffer[payloadEnd:]
-			
+
 			realcksum = dblsha(payload)[:4]
 			if realcksum != cksum:
 				self.logger.debug('Wrong checksum on `%s\' message (%s vs actual:%s); ignoring' % (cmd, b2a_hex(cksum), b2a_hex(realcksum)))
 				return
-			
+
 			if hasattr(self, method):
 				getattr(self, method)(payload)
-	
+
 	def pushMessage(self, *a, **ka):
 		self.push(self.server.makeMessage(*a, **ka))
-	
+
 	def makeVersion(self):
 		r = pack('<lQq26s26sQ',
 			60000,              # version
@@ -109,13 +109,13 @@ class BitcoinLink(networkserver.SocketHandler):
 		r += varlenEncode(len(UA)) + UA
 		r += b'\0\0\0\0'         # start_height
 		return r
-	
+
 	def pushVersion(self):
 		if self.sentVersion:
 			return
 		self.pushMessage('version', self.makeVersion())
 		self.sentVersion = True
-	
+
 	def doCmd_inv(self, payload):
 		(invCount, payload) = varlenDecode(payload)
 		for i in range(invCount):
@@ -125,11 +125,11 @@ class BitcoinLink(networkserver.SocketHandler):
 			method = 'doInv_%s' % (invType,)
 			if hasattr(self, method):
 				getattr(self, method)(invHash)
-	
+
 	def doInv_2(self, blkhash):  # MSG_BLOCK
 		self.logger.debug('Received block inv over p2p for %s' % (b2a_hex(blkhash[::-1]).decode('ascii'),))
 		self.server.newBlock(blkhash)
-	
+
 	def doCmd_version(self, payload):
 		# FIXME: check for loopbacks
 		self.pushVersion()
@@ -138,9 +138,9 @@ class BitcoinLink(networkserver.SocketHandler):
 
 class BitcoinNode(networkserver.AsyncSocketServer):
 	logger = logging.getLogger('BitcoinNode')
-	
+
 	waker = True
-	
+
 	def __init__(self, netid, *a, **ka):
 		ka.setdefault('RequestHandlerClass', BitcoinLink)
 		super().__init__(*a, **ka)
@@ -148,7 +148,7 @@ class BitcoinNode(networkserver.AsyncSocketServer):
 		self.userAgent = b'/BitcoinNode:0.1/'
 		self.nonce = 0  # FIXME
 		self._om = deque()
-	
+
 	def pre_schedule(self):
 		OM = self._om
 		while OM:
@@ -163,19 +163,19 @@ class BitcoinNode(networkserver.AsyncSocketServer):
 					CB += 1
 			cmd = m[4:0x10].rstrip(b'\0').decode('utf8')
 			self.logger.info('Sent `%s\' to %d nodes' % (cmd, CB))
-	
+
 	def makeMessage(self, cmd, payload = b''):
 		cmd = cmd.encode('utf8')
 		assert len(cmd) <= 12
 		cmd += b'\0' * (12 - len(cmd))
-		
+
 		cksum = dblsha(payload)[:4]
 		payloadLen = pack('<L', len(payload))
 		return self.netid + cmd + payloadLen + cksum + payload
-	
+
 	def submitBlock(self, payload):
 		self._om.append(self.makeMessage('block', payload))
 		self.wakeup()
-	
+
 	def newBlock(self, blkhash):
 		pass

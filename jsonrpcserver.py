@@ -33,22 +33,22 @@ class JSONRPCHandler(httpserver.HTTPHandler):
 	default_quirks = {
 		'NELH': None,  # FIXME: identify which clients have a problem with this
 	}
-	
+
 	LPHeaders = {
 		'X-Long-Polling': None,
 	}
-	
+
 	JSONRPCURIs = (b'/', b'/LP', b'/LP/')
-	
+
 	logger = logging.getLogger('JSONRPCHandler')
-	
+
 	def final_init(server):
 		pass
-	
+
 	def __init__(self, *a, **ka):
 		super().__init__(*a, **ka)
 		self.UA = None
-	
+
 	def sendReply(self, status=200, body=b'', headers=None, *a, **ka):
 		headers = dict(headers) if headers else {}
 		if body and body[0] == 123:  # b'{'
@@ -58,30 +58,30 @@ class JSONRPCHandler(httpserver.HTTPHandler):
 				headers.setdefault('Content-Type', 'application/json')
 			headers.setdefault('X-Long-Polling', '/LP')
 		return super().sendReply(status, body, headers, *a, **ka)
-	
+
 	def fmtError(self, reason = '', code = 100):
 		reason = json.dumps(reason)
 		reason = r'{"result":null,"id":null,"error":{"name":"JSONRPCError","code":%d,"message":%s}}' % (code, reason)
 		reason = reason.encode('utf8')
 		return reason
-	
+
 	def doError(self, reason = '', code = 100):
 		reason = self.fmtError(reason, code)
 		return self.sendReply(500, reason)
-	
+
 	_MidstateNotAdv = (b'phoenix', b'poclbm', b'gminor')
 	def doHeader_user_agent(self, value):
 		self.reqinfo['UA'] = value
 		self.UA = value.decode('latin-1')  # technically ASCII, but latin-1 ignores errors
 		quirks = self.quirks
 		(UA, v, *x) = value.split(b'/', 1) + [None]
-		
+
 		# Temporary HACK to keep working with older gmp-proxy
 		# NOTE: This will go away someday.
 		if UA == b'AuthServiceProxy':
 			# SubmitBlock Boolean
 			quirks['SBB'] = None
-		
+
 		try:
 			if v[0] == b'v': v = v[1:]
 			v = tuple(map(int, v.split(b'.'))) + (0,0,0)
@@ -95,23 +95,23 @@ class JSONRPCHandler(httpserver.HTTPHandler):
 					quirks['NELH'] = None
 			else:
 				quirks['midstate'] = None
-	
+
 	def doHeader_x_minimum_wait(self, value):
 		self.reqinfo['MinWait'] = int(value)
-	
+
 	def doHeader_x_mining_extensions(self, value):
 		self.extensions = value.decode('ascii').lower().split(' ')
-	
+
 	def processLP(self, lpid):
 		lpw = self.server.LPId
 		if isinstance(lpid, str):
 			if lpw != lpid:
 				return
 		self.doLongpoll()
-	
+
 	def doLongpoll(self, *a):
 		timeNow = time()
-		
+
 		self._LP = True
 		self._LPCall = a
 		if 'NELH' not in self.quirks:
@@ -121,38 +121,38 @@ class JSONRPCHandler(httpserver.HTTPHandler):
 			self.changeTask(self._chunkedKA, timeNow + 45)
 		else:
 			self.changeTask(None)
-		
+
 		waitTime = self.reqinfo.get('MinWait', 15)  # TODO: make default configurable
 		self.waitTime = waitTime + timeNow
-		
+
 		totfromme = self.LPTrack()
 		self.server._LPClients[id(self)] = self
 		self.logger.debug("New LP client; %d total; %d from %s" % (len(self.server._LPClients), totfromme, self.remoteHost))
-		
+
 		raise WithinLongpoll
-	
+
 	def _chunkedKA(self):
 		# Keepalive via chunked transfer encoding
 		self.push(b"1\r\n \r\n")
 		self.changeTask(self._chunkedKA, time() + 45)
-	
+
 	def LPTrack(self):
 		myip = self.remoteHost
 		if myip not in self.server.LPTracking:
 			self.server.LPTracking[myip] = 0
 		self.server.LPTracking[myip] += 1
-		
+
 		myuser = self.Username
 		if myuser not in self.server.LPTrackingByUser:
 			self.server.LPTrackingByUser[myuser] = 0
 		self.server.LPTrackingByUser[myuser] += 1
-		
+
 		return self.server.LPTracking[myip]
-	
+
 	def LPUntrack(self):
 		self.server.LPTracking[self.remoteHost] -= 1
 		self.server.LPTrackingByUser[self.Username] -= 1
-	
+
 	def cleanupLP(self):
 		# Called when the connection is closed
 		if not self._LP:
@@ -163,7 +163,7 @@ class JSONRPCHandler(httpserver.HTTPHandler):
 		except KeyError:
 			pass
 		self.LPUntrack()
-	
+
 	def wakeLongpoll(self, wantClear = False):
 		now = time()
 		if now < self.waitTime:
@@ -171,9 +171,9 @@ class JSONRPCHandler(httpserver.HTTPHandler):
 			return
 		else:
 			self.changeTask(None)
-		
+
 		self.LPUntrack()
-		
+
 		self.server.tls.wantClear = wantClear
 		try:
 			rv = self._doJSON_i(*self._LPCall, longpoll=True)
@@ -187,7 +187,7 @@ class JSONRPCHandler(httpserver.HTTPHandler):
 			self.push(('%x' % len(rv)).encode('utf8') + b"\r\n" + rv + b"\r\n0\r\n\r\n")
 			self.reset_request()
 			return
-		
+
 		try:
 			self.sendReply(200, body=rv, headers=self.LPHeaders, tryCompression=False)
 			raise httpserver.RequestNotHandled
@@ -196,7 +196,7 @@ class JSONRPCHandler(httpserver.HTTPHandler):
 			pass
 		finally:
 			self.reset_request()
-	
+
 	def _doJSON_i(self, reqid, method, params, longpoll = False):
 		try:
 			rv = getattr(self, method)(*params)
@@ -215,7 +215,7 @@ class JSONRPCHandler(httpserver.HTTPHandler):
 			return efun(r'Error encoding reply in JSON')
 		rv = rv.encode('utf8')
 		return rv if longpoll else self.sendReply(200, rv, headers=self._JSONHeaders)
-	
+
 	def doJSON(self, data, longpoll = False):
 		# TODO: handle JSON errors
 		try:
@@ -246,11 +246,11 @@ class JSONRPCHandler(httpserver.HTTPHandler):
 		if longpoll and not params:
 			procfun = self.doLongpoll
 		return procfun(jsonid, method, params)
-	
+
 	def handle_close(self):
 		self.cleanupLP()
 		super().handle_close()
-	
+
 	def handle_request(self):
 		if not self.method in (b'GET', b'POST'):
 			return self.sendReply(405)
@@ -272,12 +272,12 @@ class JSONRPCHandler(httpserver.HTTPHandler):
 		except:
 			self.logger.error(traceback.format_exc())
 			return self.doError('uncaught error')
-	
+
 	def reset_request(self):
 		self._LP = False
 		self.JSONRPCMethod = None
 		super().reset_request()
-	
+
 setattr(JSONRPCHandler, 'doHeader_user-agent', JSONRPCHandler.doHeader_user_agent);
 setattr(JSONRPCHandler, 'doHeader_x-minimum-wait', JSONRPCHandler.doHeader_x_minimum_wait);
 setattr(JSONRPCHandler, 'doHeader_x-mining-extensions', JSONRPCHandler.doHeader_x_mining_extensions);
@@ -286,35 +286,35 @@ JSONRPCListener = networkserver.NetworkListener
 
 class JSONRPCServer(networkserver.AsyncSocketServer):
 	logger = logging.getLogger('JSONRPCServer')
-	
+
 	waker = True
-	
+
 	def __init__(self, *a, **ka):
 		ka.setdefault('RequestHandlerClass', JSONRPCHandler)
 		super().__init__(*a, **ka)
-		
+
 		self.SecretUser = None
 		self.ShareTarget = 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-		
+
 		self._LPId = 0
 		self.LPId = '%d' % (time(),)
 		self.LPRequest = False
 		self._LPClients = {}
 		self._LPWaitTime = time() + 15
-		
+
 		self.LPTracking = {}
 		self.LPTrackingByUser = {}
-	
+
 	def checkAuthentication(self, username, password):
 		return True
-	
+
 	def final_init(self):
 		JSONRPCHandler.final_init(self)
-	
+
 	def pre_schedule(self):
 		if self.LPRequest == 1:
 			self._LPsch()
-	
+
 	def wakeLongpoll(self, wantClear = False):
 		if self.LPRequest:
 			self.logger.info('Ignoring longpoll attempt while another is waiting')
@@ -324,7 +324,7 @@ class JSONRPCServer(networkserver.AsyncSocketServer):
 		self._LPWantClear = wantClear
 		self.LPRequest = 1
 		self.wakeup()
-	
+
 	def _LPsch(self):
 		now = time()
 		if self._LPWaitTime > now:
@@ -334,7 +334,7 @@ class JSONRPCServer(networkserver.AsyncSocketServer):
 			self.LPRequest = 2
 		else:
 			self._actualLP()
-	
+
 	def _actualLP(self):
 		self.LPRequest = False
 		C = tuple(self._LPClients.values())
@@ -344,9 +344,9 @@ class JSONRPCServer(networkserver.AsyncSocketServer):
 			return
 		OC = len(C)
 		self.logger.debug("%d clients to wake up..." % (OC,))
-		
+
 		now = time()
-		
+
 		for ic in C:
 			self.lastHandler = ic
 			try:
@@ -357,17 +357,17 @@ class JSONRPCServer(networkserver.AsyncSocketServer):
 			except:
 				OC -= 1
 				self.logger.debug('Error waking longpoll handler:\n' + traceback.format_exc())
-		
+
 		self._LPWaitTime = time()
 		self.logger.info('Longpoll woke up %d clients in %.3f seconds' % (OC, self._LPWaitTime - now))
 		self._LPWaitTime += 5  # TODO: make configurable: minimum time between longpolls
-	
+
 	def TopLPers(self, n = 0x10):
 		tmp = list(self.LPTracking.keys())
 		tmp.sort(key=lambda k: self.LPTracking[k])
 		for jerk in map(lambda k: (k, self.LPTracking[k]), tmp[-n:]):
 			print(jerk)
-	
+
 	def TopLPersByUser(self, n = 0x10):
 		tmp = list(self.LPTrackingByUser.keys())
 		tmp.sort(key=lambda k: self.LPTrackingByUser[k])
