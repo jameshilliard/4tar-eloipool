@@ -19,6 +19,7 @@
 import argparse
 import importlib
 argparser = argparse.ArgumentParser()
+argparser.add_argument('-d', '--daemon', help='Run in daemon mode', action="store_true")
 argparser.add_argument('-c', '--config', help='Config name to load from config_<ARG>.py')
 args = argparser.parse_args()
 configmod = 'config'
@@ -837,13 +838,17 @@ def restoreState(SAVE_STATE_FILENAME):
 
 
 from jsonrpcserver import JSONRPCListener, JSONRPCServer
-import interactivemode
 from networkserver import NetworkListener
 import threading
 import sharelogging
 import authentication
 from stratumserver import StratumServer
 import imp
+
+if args.daemon:
+	import daemon
+	daemon.daemonize(cdir = None)
+
 
 if __name__ == "__main__":
 	if not hasattr(config, 'ShareLogging'):
