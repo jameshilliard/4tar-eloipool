@@ -94,7 +94,7 @@ from base58 import b58decode
 from binascii import b2a_hex
 from struct import pack
 import subprocess
-from time import time
+from time import time, sleep
 
 def makeCoinbaseTxn(coinbaseValue, useCoinbaser = True, prevBlockHex = None):
 	txn = Txn.new()
@@ -382,35 +382,22 @@ def blockSubmissionThread(payload, blkhash, share):
 			# BIP 22 standard submitblock
 			reason = UpstreamBitcoindJSONRPC.submitblock(payload)
 		except BaseException as gbterr:
-			gbterr_fmt = traceback.format_exc()
-			try:
-				try:
-					# bitcoind 0.5/0.6 getmemorypool
-					reason = UpstreamBitcoindJSONRPC.getmemorypool(payload)
-				except:
-					# Old BIP 22 draft getmemorypool
-					reason = UpstreamBitcoindJSONRPC.getmemorypool(payload, {})
-				if reason is True:
-					reason = None
-				elif reason is False:
-					reason = 'rejected'
-			except BaseException as gmperr:
-				now = time()
-				if now > nexterr:
-					# FIXME: This will show "Method not found" on pre-BIP22 servers
-					RaiseRedFlags(gbterr_fmt)
-					nexterr = now + 5
-				if MM.currentBlock[0] not in myblock and tries > len(servers):
-					RBFs.append( (('next block', MM.currentBlock, now, (gbterr, gmperr)), payload, blkhash, share) )
-					RaiseRedFlags('Giving up on submitting block to upstream \'%s\'' % (TS['name'],))
-					if share['upstreamRejectReason'] is PendingUpstream:
-						share['upstreamRejectReason'] = 'GAVE UP'
-						share['upstreamResult'] = False
-						logShare(share)
-					return
+			now = time()
+			if now > nexterr:
+				# FIXME: This will show "Method not found" on pre-BIP22 servers
+				RaiseRedFlags(traceback.format_exc())
+				nexterr = now + 5
+			if MM.currentBlock[0] not in myblock and tries > len(servers):
+				RBFs.append( (('next block', MM.currentBlock, now, gbterr), payload, blkhash, share) )
+				RaiseRedFlags('Giving up on submitting block to upstream \'%s\'' % (TS['name'],))
+				if share['upstreamRejectReason'] is PendingUpstream:
+					share['upstreamRejectReason'] = 'GAVE UP'
+					share['upstreamResult'] = False
+					logShare(share)
+				return
 
-				servers.append(TS)
-				continue
+			servers.append(TS)
+			continue
 
 		# At this point, we have a reason back
 		if reason:
