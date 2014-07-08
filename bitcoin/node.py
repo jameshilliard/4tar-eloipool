@@ -50,12 +50,13 @@ class BitcoinLink(networkserver.SocketHandler):
 			sock.connect(dest)
 			ka['sock'] = sock
 			ka['addr'] = dest
+		ka['auto_reconn'] = True
 		super().__init__(*a, **ka)
 		self.dest = dest
-		self.sentVersion = False
 		self.changeTask(None)  # FIXME: TEMPORARY
 		if dest:
-			self.pushVersion()
+			self._OnConnected = self.OnConnected
+			self._OnConnected()
 
 	def handle_readbuf(self):
 		netid = self.server.netid
@@ -115,6 +116,10 @@ class BitcoinLink(networkserver.SocketHandler):
 			return
 		self.pushMessage('version', self.makeVersion())
 		self.sentVersion = True
+
+	def OnConnected(self):
+		self.sentVersion = False
+		self.pushVersion()
 
 	def doCmd_inv(self, payload):
 		(invCount, payload) = varlenDecode(payload)

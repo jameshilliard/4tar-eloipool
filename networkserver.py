@@ -20,7 +20,7 @@ import os
 import select
 import socket
 import threading
-from time import time
+from time import time, sleep
 import traceback
 from util import ScheduleDict, WithNoop, tryErr
 from errno import EHOSTUNREACH, ETIMEDOUT
@@ -164,6 +164,34 @@ class SocketHandler:
 				return
 			self.server.register_socket_m(self.fd, EPOLL_READ)
 
+	def reconnHandler(self):
+		self.socket.close()
+		self.fd = -1
+
+		sock = self.socket
+
+		while True:
+			try:
+				sleep(1)
+				self.logger.debug("Try re-connecting %s..." % str(self.addr))
+
+				sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+				sock.connect(self.addr)
+
+				break
+			except:
+				self.logger.debug("Try re-connecting %s... failed with\n%s" % (self.addr, traceback.format_exc()))
+
+		self.wbuf = b''
+		self.socket = sock
+		self.fd = sock.fileno()
+
+		self._add_to_server()
+		if self._OnConnected:
+			self._OnConnected()
+
+		self.logger.info("sock %d: %s re-connecting done" % (self.fd, self.addr))
+
 	def close(self):
 		if self.wbuf:
 			self.closeme = True
@@ -171,11 +199,22 @@ class SocketHandler:
 		if self.fd == -1:
 			# Already closed
 			return
+
 		try:
 			del self.server.connections[id(self)]
 		except:
 			pass
+
 		self.server.unregister_socket(self.fd)
+		if self.auto_reconn:
+			self.logger.info("sock %d: %s disconnected, let's see what will happen" % (self.fd, self.addr))
+			#self.logger.info("sock %d: %s disconnected, re-connecting now" % (self.fd, self.addr))
+
+			#reconn_thr = threading.Thread(target=self.reconnHandler)
+			#reconn_thr.daemon = True
+			#reconn_thr.start()
+			#return
+
 		self.changeTask(None)
 		self.socket.close()
 		self.fd = -1
@@ -191,7 +230,11 @@ class SocketHandler:
 		else:
 			self._Task = None
 
-	def __init__(self, server, sock, addr):
+	def _add_to_server(self):
+		self.server.register_socket(self.fd, self)
+		self.server.connections[id(self)] = self
+
+	def __init__(self, server, sock, addr, auto_reconn = False):
 		self.ac_in_buffer = b''
 		self.incoming = []
 		self.wbuf = b''
@@ -199,10 +242,11 @@ class SocketHandler:
 		self.server = server
 		self.socket = sock
 		self.addr = addr
+		self.auto_reconn = auto_reconn
 		self._Task = None
+		self._OnConnected = None
 		self.fd = sock.fileno()
-		server.register_socket(self.fd, self)
-		server.connections[id(self)] = self
+		self._add_to_server()
 		self.changeTask(self.handle_timeout, time() + 15)
 
 	@classmethod

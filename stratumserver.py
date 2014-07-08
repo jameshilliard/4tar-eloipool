@@ -146,6 +146,7 @@ class StratumHandler(networkserver.SocketHandler):
 				],
 			})
 			self.lastBDiff = bdiff
+		self.logger.info("sendJob to %s" % str(self.addr))
 		self.push(self.server.JobBytes)
 		if len(self.JobTargets) > 4:
 			self.JobTargets.popitem(False)

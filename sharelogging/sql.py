@@ -52,7 +52,7 @@ class sql:
 		try:
 			dbc.execute(stmt, params)
 		except BaseException as e:
-			_logger.critical('Error inserting data: %s%s' % ((stmt, params), traceback.format_exc()))
+			_logger.critical('Error inserting data: %s\n%s' % ((stmt, params), traceback.format_exc()))
 			self.exceptions.append((stmt, params, e))
 			return
 		self.db.commit()

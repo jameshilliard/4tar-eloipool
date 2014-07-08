@@ -36,17 +36,16 @@ _makeCoinbase = [0, 0]
 _filecounter = 0
 
 def MakeBlockHeader(MRD):
-	(merkleRoot, merkleTree, coinbase, prevBlock, bits) = MRD[:5]
+	#(merkleRoot, merkleTree, coinbase, prevBlock, bits) = MRD[:5]
 	timestamp = pack('<L', int(time()))
-	hdr = b'\2\0\0\0' + prevBlock + merkleRoot + timestamp + bits + b'iolE'
+	hdr = b'\2\0\0\0' + MRD[3] + MRD[0] + timestamp + MRD[4] + b'iolE'
 	return hdr
 
 def assembleBlock(blkhdr, txlist):
-	payload = blkhdr
-	payload += varlenEncode(len(txlist))
+	blkhdr += varlenEncode(len(txlist))
 	for tx in txlist:
-		payload += tx.data
-	return payload
+		blkhdr += tx.data
+	return blkhdr
 
 class merkleMaker(threading.Thread):
 	GBTCaps = [
@@ -60,10 +59,6 @@ class merkleMaker(threading.Thread):
 	]
 	GBTReq = {
 		'capabilities': GBTCaps,
-	}
-	GMPReq = {
-		'capabilities': GBTCaps,
-		'tx': 'obj',
 	}
 
 	def __init__(self, *a, **k):
@@ -178,9 +173,7 @@ class merkleMaker(threading.Thread):
 				if self.needMerkle == 1:
 					self.needMerkle = False
 				self.onBlockUpdate()
-
-		# Old block is invalid
-		if self.currentBlock[0] != newBlock:
+		else:
 			self.lastBlock = self.currentBlock
 
 		lastHeight = self.currentBlock[1]
@@ -462,6 +455,7 @@ class merkleMaker(threading.Thread):
 
 	def _updateMerkleTree_fromTS(self, TS):
 		MP = self._CallGBT(TS)
+		self.logger.debug("To call _ProcessGBT")
 		newMerkleTree = self._ProcessGBT(MP, TS)
 
 		# Some versions of bitcoinrpc ServiceProxy have problems copying/pickling, so just store name and URI for now
@@ -525,12 +519,13 @@ class merkleMaker(threading.Thread):
 		MP = BestMT.MP
 		blkbasics = (MP['_prevBlock'], MP['height'], MP['_bits'])
 		if blkbasics != self.currentBlock:
+			self.logger.debug("blkbasics = %s", blkbasics)
 			self.updateBlock(*blkbasics, _HBH=(MP['previousblockhash'], MP['bits']))
 		self.currentMerkleTree = BestMT
 
 	def _updateMerkleTree(self):
 		global now
-		self.logger.debug('Polling for new block template')
+		self.logger.debug('Polling for new block template %d' % self.TxnUpdateRetryWait)
 		self.nextMerkleUpdate = now + self.TxnUpdateRetryWait
 
 		self._updateMerkleTree_I()
@@ -631,32 +626,42 @@ class merkleMaker(threading.Thread):
 	def merkleMaker_II(self):
 		global now
 
+		#self.logger.setLevel(logging.DEBUG)
+
 		# No bits = no mining :(
 		if not self.ready:
+			#self.logger.debug("1111111111111111111111")
 			return self._updateMerkleTree()
 
 		# First, ensure we have the minimum clear, next, and regular (in that order)
 		if self.clearMerkleRoots.qsize() < self.WorkQueueSizeClear[0]:
+			#self.logger.debug("2222222222222222222222222222")
 			return self.makeClear()
 		if self.nextMerkleRoots.qsize() < self.WorkQueueSizeLongpoll[0]:
+			#self.logger.debug("3333333333333333333333333333333")
 			return self.makeNext()
 		if len(self.merkleRoots) < self.WorkQueueSizeRegular[0]:
+			#self.logger.debug("444444444444444444444444444444444")
 			return self.makeRegular()
 
 		# If we've met the minimum requirements, consider updating the merkle tree
 		if self.nextMerkleUpdate <= now:
+			#self.logger.debug("5555555555555555555555555555555555")
 			return self._updateMerkleTree()
 
 		# Finally, fill up clear, next, and regular until we've met the maximums
 		if self.clearMerkleRoots.qsize() < self.WorkQueueSizeClear[1]:
+			#self.logger.debug("6666666666666666666666666666666666666")
 			return self.makeClear()
 		if self.nextMerkleRoots.qsize() < self.WorkQueueSizeLongpoll[1]:
+			#self.logger.debug("777777777777777777777777777777777777777")
 			return self.makeNext()
 		if len(self.merkleRoots) < self.WorkQueueSizeRegular[1] or self.merkleRoots[0][1] != self.currentMerkleTree:
 			return self.makeRegular()
 
 		# Nothing left to do, fire onBlockUpdate event (if appropriate) and sleep
 		if self.needMerkle == 1:
+			self.logger.debug("99999999999999999999999999999999999999999999")
 			self.onBlockUpdate()
 			self.needMerkle = False
 		self._doing('idle')
@@ -720,6 +725,7 @@ def _test():
 	now = 1337039788
 	MM = merkleMaker()
 	reallogger = MM.logger
+	reallogger.info('_test() start')
 	class fakelogger:
 		LO = False
 		def critical(self, *a):
@@ -804,5 +810,6 @@ def _test():
 	assert len(nMT.data) in (2, 4)
 	nMT.data[0].disassemble()
 	assert sum(outp[0] for outp in nMT.data[0].outputs) == 2
+	reallogger.info('_test() done')
 
 _test()
