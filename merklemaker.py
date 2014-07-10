@@ -725,7 +725,6 @@ def _test():
 	now = 1337039788
 	MM = merkleMaker()
 	reallogger = MM.logger
-	reallogger.info('_test() start')
 	class fakelogger:
 		LO = False
 		def critical(self, *a):
@@ -810,6 +809,5 @@ def _test():
 	assert len(nMT.data) in (2, 4)
 	nMT.data[0].disassemble()
 	assert sum(outp[0] for outp in nMT.data[0].outputs) == 2
-	reallogger.info('_test() done')
 
 _test()

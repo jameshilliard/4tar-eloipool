@@ -129,7 +129,6 @@ def makeCoinbaseTxn(coinbaseValue, useCoinbaser = True, prevBlockHex = None):
 	return txn
 
 
-import jsonrpc_getwork
 from util import Bits2Target
 
 workLog = {}
@@ -137,14 +136,12 @@ userStatus = {}
 networkTarget = None
 DupeShareHACK = {}
 
-server = None
 stratumsrv = None
 def updateBlocks():
-	server.wakeLongpoll()
 	stratumsrv.updateJob()
 
 def blockChanged():
-	global MM, networkTarget, server
+	global MM, networkTarget
 	bits = MM.currentBlock[2]
 	if bits is None:
 		networkTarget = None
@@ -153,9 +150,7 @@ def blockChanged():
 	if MM.lastBlock != (None, None, None):
 		global DupeShareHACK
 		DupeShareHACK = {}
-		jsonrpc_getwork._CheckForDupesHACK = {}
 		workLog.clear()
-	server.wakeLongpoll(wantClear=True)
 	stratumsrv.updateJob(wantClear=True)
 
 
@@ -306,30 +301,6 @@ def RegisterWork(username, wli, wld, RequestedTarget = None):
 	workLog.setdefault(username, {})[wli] = (wld, now)
 	return target or config.ShareTarget
 
-def getBlockHeader(username):
-	MRD = MM.getMRD()
-	merkleRoot = MRD[0]
-	hdr = MakeBlockHeader(MRD)
-	workLog.setdefault(username, {})[merkleRoot] = (MRD, time())
-	target = RegisterWork(username, merkleRoot, MRD)
-	return (hdr, workLog[username][merkleRoot], target)
-
-def getBlockTemplate(username, p_magic = None, RequestedTarget = None):
-	if server.tls.wantClear:
-		wantClear = True
-	elif p_magic and username not in workLog:
-		wantClear = True
-		p_magic[0] = True
-	else:
-		wantClear = False
-	MC = MM.getMC(wantClear)
-	(dummy, merkleTree, coinbase, prevBlock, bits) = MC[:5]
-	wliPos = coinbase[0] + 2
-	wliLen = coinbase[wliPos - 1]
-	wli = coinbase[wliPos:wliPos+wliLen]
-	target = RegisterWork(username, wli, MC, RequestedTarget=RequestedTarget)
-	return (MC, workLog[username][wli], target)
-
 def getStratumJob(jobid, wantClear = False):
 	MC = MM.getMC(wantClear)
 	(dummy, merkleTree, coinbase, prevBlock, bits) = MC[:5]
@@ -463,45 +434,18 @@ def checkShare(share):
 	shareTime = share['time'] = time()
 
 	username = share['username']
-	isstratum = False
-	if 'data' in share:
-		# getwork/GBT
-		checkData(share)
-		data = share['data']
 
-		if username not in workLog:
-			raise RejectedShare('unknown-user')
-		MWL = workLog[username]
-
-		shareMerkleRoot = data[36:68]
-		if 'blkdata' in share:
-			pl = share['blkdata']
-			(txncount, pl) = varlenDecode(pl)
-			cbtxn = bitcoin.txn.Txn(pl)
-			othertxndata = cbtxn.disassemble(retExtra=True)
-			coinbase = cbtxn.getCoinbase()
-			wliPos = coinbase[0] + 2
-			wliLen = coinbase[wliPos - 1]
-			wli = coinbase[wliPos:wliPos+wliLen]
-			mode = 'MC'
-			moden = 1
-		else:
-			wli = shareMerkleRoot
-			mode = 'MRD'
-			moden = 0
-			coinbase = None
-	else:
-		# Stratum
-		isstratum = True
-		wli = share['jobid']
-		buildStratumData(share, b'\0' * 32)
-		mode = 'MC'
-		moden = 1
-		othertxndata = b''
-		if None not in workLog:
-			# We haven't yet sent any stratum work for this block
-			raise RejectedShare('unknown-work')
-		MWL = workLog[None]
+	# Stratum
+	isstratum = True
+	wli = share['jobid']
+	buildStratumData(share, b'\0' * 32)
+	mode = 'MC'
+	moden = 1
+	othertxndata = b''
+	if None not in workLog:
+		# We haven't yet sent any stratum work for this block
+		raise RejectedShare('unknown-work')
+	MWL = workLog[None]
 
 	if wli not in MWL:
 		raise RejectedShare('unknown-work')
@@ -707,8 +651,8 @@ def stopServers():
 	stopServers.already = True
 
 	logger.info('Stopping servers...')
-	global bcnode, server
-	servers = (bcnode, server, stratumsrv)
+	global bcnode
+	servers = (bcnode, stratumsrv)
 	for s in servers:
 		s.keepgoing = False
 	for s in servers:
@@ -824,7 +768,6 @@ def restoreState(SAVE_STATE_FILENAME):
 		logger.info('Total downtime: %g seconds' % (time() - t,))
 
 
-from jsonrpcserver import JSONRPCListener, JSONRPCServer
 from networkserver import NetworkListener
 import threading
 import sharelogging
@@ -903,34 +846,7 @@ if __name__ == "__main__":
 	if hasattr(config, 'UpstreamBitcoindNode') and config.UpstreamBitcoindNode:
 		BitcoinLink(bcnode, dest=config.UpstreamBitcoindNode)
 
-	import jsonrpc_getblocktemplate
-	import jsonrpc_getwork
-	import jsonrpc_setworkaux
-
-	server = JSONRPCServer()
-	server.tls = threading.local()
-	server.tls.wantClear = False
-	if hasattr(config, 'JSONRPCAddress'):
-		logging.getLogger('backwardCompatibility').warn('JSONRPCAddress configuration variable is deprecated; upgrade to JSONRPCAddresses list before 2013-03-05')
-		if not hasattr(config, 'JSONRPCAddresses'):
-			config.JSONRPCAddresses = []
-		config.JSONRPCAddresses.insert(0, config.JSONRPCAddress)
-	LS = []
-	for a in config.JSONRPCAddresses:
-		LS.append(JSONRPCListener(server, a))
-	if hasattr(config, 'SecretUser'):
-		server.SecretUser = config.SecretUser
-	server.aux = MM.CoinbaseAux
-	server.getBlockHeader = getBlockHeader
-	server.getBlockTemplate = getBlockTemplate
-	server.receiveShare = receiveShare
-	server.RaiseRedFlags = RaiseRedFlags
-	server.ShareTarget = config.ShareTarget
-	server.checkAuthentication = checkAuthentication
-
-	if hasattr(config, 'TrustedForwarders'):
-		server.TrustedForwarders = config.TrustedForwarders
-	server.ServerName = config.ServerName
+	#import jsonrpc_getblocktemplate
 
 	stratumsrv = StratumServer()
 	stratumsrv.getStratumJob = getStratumJob
@@ -958,8 +874,4 @@ if __name__ == "__main__":
 	bcnode_thr.daemon = True
 	bcnode_thr.start()
 
-	stratum_thr = threading.Thread(target=stratumsrv.serve_forever)
-	stratum_thr.daemon = True
-	stratum_thr.start()
-
-	server.serve_forever()
+	stratumsrv.serve_forever()

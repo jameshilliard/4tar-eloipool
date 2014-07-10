@@ -208,12 +208,12 @@ class SocketHandler:
 		self.server.unregister_socket(self.fd)
 		if self.auto_reconn:
 			self.logger.info("sock %d: %s disconnected, let's see what will happen" % (self.fd, self.addr))
-			#self.logger.info("sock %d: %s disconnected, re-connecting now" % (self.fd, self.addr))
+			self.logger.info("sock %d: %s disconnected, re-connecting now" % (self.fd, self.addr))
 
-			#reconn_thr = threading.Thread(target=self.reconnHandler)
-			#reconn_thr.daemon = True
-			#reconn_thr.start()
-			#return
+			reconn_thr = threading.Thread(target=self.reconnHandler)
+			reconn_thr.daemon = True
+			reconn_thr.start()
+			return
 
 		self.changeTask(None)
 		self.socket.close()
