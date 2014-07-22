@@ -585,6 +585,7 @@ checkShare.logger = logging.getLogger('checkShare')
 
 def logShare(share):
 	if '_origdata' in share:
+		
 		share['solution'] = share['_origdata']
 	else:
 		share['solution'] = b2a_hex(swap32(share['data'])).decode('utf8')
@@ -592,6 +593,8 @@ def logShare(share):
 		i.logShare(share)
 
 def checkAuthentication(username, password):
+	return True
+
 	# HTTPServer uses bytes, and StratumServer uses str
 	if hasattr(username, 'decode'): username = username.decode('utf8')
 	if hasattr(password, 'decode'): password = password.decode('utf8')
@@ -783,36 +786,7 @@ if args.daemon:
 if __name__ == "__main__":
 	if not hasattr(config, 'ShareLogging'):
 		config.ShareLogging = ()
-	if hasattr(config, 'DbOptions'):
-		logging.getLogger('backwardCompatibility').warn('DbOptions configuration variable is deprecated; upgrade to ShareLogging var before 2013-03-05')
-		config.ShareLogging = list(config.ShareLogging)
-		config.ShareLogging.append( {
-			'type': 'sql',
-			'engine': 'postgres',
-			'dbopts': config.DbOptions,
-			'statement': "insert into shares (rem_host, username, our_result, upstream_result, reason, solution) values ({Q(remoteHost)}, {username}, {YN(not(rejectReason))}, {YN(upstreamResult)}, {rejectReason}, decode({solution}, 'hex'))",
-		} )
 	for i in config.ShareLogging:
-		if not hasattr(i, 'keys'):
-			name, parameters = i
-			logging.getLogger('backwardCompatibility').warn('Using short-term backward compatibility for ShareLogging[\'%s\']; be sure to update config before 2012-04-04' % (name,))
-			if name == 'postgres':
-				name = 'sql'
-				i = {
-					'engine': 'postgres',
-					'dbopts': parameters,
-				}
-			elif name == 'logfile':
-				i = {}
-				i['thropts'] = parameters
-				if 'filename' in parameters:
-					i['filename'] = parameters['filename']
-					i['thropts'] = dict(i['thropts'])
-					del i['thropts']['filename']
-			else:
-				i = parameters
-			i['type'] = name
-
 		name = i['type']
 		parameters = i
 		try:
@@ -845,8 +819,6 @@ if __name__ == "__main__":
 
 	if hasattr(config, 'UpstreamBitcoindNode') and config.UpstreamBitcoindNode:
 		BitcoinLink(bcnode, dest=config.UpstreamBitcoindNode)
-
-	#import jsonrpc_getblocktemplate
 
 	stratumsrv = StratumServer()
 	stratumsrv.getStratumJob = getStratumJob
