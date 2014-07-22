@@ -48,14 +48,22 @@ class sql:
 
 	def _doInsert(self, o):
 		(stmt, params) = o
-		dbc = self.db.cursor()
-		try:
-			dbc.execute(stmt, params)
-		except BaseException as e:
-			_logger.critical('Error inserting data: %s\n%s' % ((stmt, params), traceback.format_exc()))
-			self.exceptions.append((stmt, params, e))
-			return
-		self.db.commit()
+		reconn = 0
+		while reconn < 3:
+			try:
+				if reconn:
+					self._connect()
+				self.db.cursor().execute(stmt, params)
+				break
+			except BaseException as e:
+				reconn += 1
+				_logger.warn('Error(%d) happened when inserting data: %s\n%s, reset db connection' % (reconn, (stmt, params), traceback.format_exc()))
+				if reconn == 1:
+					self.exceptions.append((stmt, params, e))
+		if reconn < 3:
+			self.db.commit()
+		else:
+			_logger.critical('Unrecoverable db error')
 
 	def _thread(self):
 		self._connect()
@@ -63,7 +71,6 @@ class sql:
 			try:
 				o = self._queue.get()
 				if o is None:
-					# Shutdown logger
 					break
 				self._doInsert(o)
 			except:
