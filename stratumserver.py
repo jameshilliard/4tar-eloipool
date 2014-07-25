@@ -66,6 +66,8 @@ class StratumHandler(networkserver.SocketHandler):
 		if not inbuf:
 			return
 
+		self.logger.debug("Get input: %s" % inbuf)
+
 		try:
 			rpc = json.loads(inbuf)
 		except ValueError:
@@ -205,8 +207,10 @@ class StratumHandler(networkserver.SocketHandler):
 			'extranonce2': bytes.fromhex(extranonce2),
 			'ntime': bytes.fromhex(ntime),
 			'nonce': bytes.fromhex(nonce),
-			'userAgent': self.UA,
-			'submitProtocol': 'stratum',
+			'height': self.server.Height,
+			#'userAgent': self.UA,
+			#'submitProtocol': 'stratum',
+			#'solution': '%s' % self.lastBDiff,
 		}
 		if jobid in self.JobTargets:
 			share['target'] = self.JobTargets[jobid]
@@ -259,6 +263,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self._Clients = {}
 		self._JobId = 0
 		self.JobId = '%d' % (time(),)
+		self.Height = 0
 		self.WakeRequest = None
 		self.UpdateTask = None
 		self._PendingQuickUpdates = set()
@@ -306,7 +311,9 @@ class StratumServer(networkserver.AsyncSocketServer):
 				forceClean or not self.IsJobValid(self.JobId)
 			],
 		}).encode('ascii') + b"\n"
+		self.logger.info("Update Job to: %s" % (self.JobBytes))
 		self.JobId = JobId
+		self.Height = height
 
 	def updateJob(self, wantClear = False):
 		if self.UpdateTask:

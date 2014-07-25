@@ -431,38 +431,36 @@ def IsJobValid(wli, wluser = None):
 	return True
 
 def checkShare(share):
-	shareTime = share['time'] = time()
+	checkShare.logger.info("Share: %s" % (share))
 
+	if None not in workLog:
+		# We haven't yet sent any stratum work for this block
+		raise RejectedShare('unknown-work')
+
+	shareTime = share['time'] = time()
 	username = share['username']
 
 	# Stratum
 	isstratum = True
 	wli = share['jobid']
-	buildStratumData(share, b'\0' * 32)
-	mode = 'MC'
-	moden = 1
+	#buildStratumData(share, b'\0' * 32)
 	othertxndata = b''
-	if None not in workLog:
-		# We haven't yet sent any stratum work for this block
-		raise RejectedShare('unknown-work')
 	MWL = workLog[None]
-
 	if wli not in MWL:
 		raise RejectedShare('unknown-work')
 	(wld, issueT) = MWL[wli]
-	share[mode] = wld
-
+	#mode = 'MC'
+	share['MC'] = wld
 	share['issuetime'] = issueT
 
 	(workMerkleTree, workCoinbase) = wld[1:3]
 	share['merkletree'] = workMerkleTree
-	if 'jobid' in share:
-		cbtxn = deepcopy(workMerkleTree.data[0])
-		coinbase = workCoinbase + share['extranonce1'] + share['extranonce2']
-		cbtxn.setCoinbase(coinbase)
-		cbtxn.assemble()
-		data = buildStratumData(share, workMerkleTree.withFirst(cbtxn))
-		shareMerkleRoot = data[36:68]
+	cbtxn = deepcopy(workMerkleTree.data[0])
+	coinbase = workCoinbase + share['extranonce1'] + share['extranonce2']
+	cbtxn.setCoinbase(coinbase)
+	cbtxn.assemble()
+	data = buildStratumData(share, workMerkleTree.withFirst(cbtxn))
+	shareMerkleRoot = data[36:68]
 
 	if data in DupeShareHACK:
 		raise RejectedShare('duplicate')
@@ -474,7 +472,8 @@ def checkShare(share):
 	blkhashn = LEhash2int(blkhash)
 
 	global networkTarget
-	logfunc = getattr(checkShare.logger, 'info' if blkhashn <= networkTarget else 'debug')
+	#logfunc = getattr(checkShare.logger, 'info' if blkhashn <= networkTarget else 'debug')
+	logfunc = checkShare.logger.info
 	logfunc('BLKHASH: %64x' % (blkhashn,))
 	logfunc(' TARGET: %64x' % (networkTarget,))
 
@@ -488,14 +487,11 @@ def checkShare(share):
 	if blkhashn <= networkTarget:
 		logfunc("Submitting upstream")
 		RBDs.append( deepcopy( (data, txlist, share.get('blkdata', None), workMerkleTree, share, wld) ) )
-		if not moden:
-			payload = assembleBlock(data, txlist)
+		payload = share['data']
+		if len(othertxndata):
+			payload += share['blkdata']
 		else:
-			payload = share['data']
-			if len(othertxndata):
-				payload += share['blkdata']
-			else:
-				payload += assembleBlock(data, txlist)[80:]
+			payload += assembleBlock(data, txlist)[80:]
 		logfunc('Real block payload: %s' % (b2a_hex(payload).decode('utf8'),))
 		RBPs.append(payload)
 		threading.Thread(target=blockSubmissionThread, args=(payload, blkhash, share)).start()
@@ -507,34 +503,11 @@ def checkShare(share):
 			share['upstreamResult'] = True
 		MM.updateBlock(blkhash)
 
-	# Gotwork hack...
-	if gotwork and blkhashn <= config.GotWorkTarget:
-		try:
-			coinbaseMrkl = cbtxn.data
-			coinbaseMrkl += blkhash
-			steps = workMerkleTree._steps
-			coinbaseMrkl += pack('B', len(steps))
-			for step in steps:
-				coinbaseMrkl += step
-			coinbaseMrkl += b"\0\0\0\0"
-			info = {}
-			info['hash'] = b2a_hex(blkhash).decode('ascii')
-			info['header'] = b2a_hex(data).decode('ascii')
-			info['coinbaseMrkl'] = b2a_hex(coinbaseMrkl).decode('ascii')
-			thr = threading.Thread(target=submitGotwork, args=(info,))
-			thr.daemon = True
-			thr.start()
-		except:
-			checkShare.logger.warning('Failed to build gotwork request')
-
 	if 'target' in share:
 		workTarget = share['target']
 	elif len(wld) > 6:
 		workTarget = wld[6]
 	else:
-		workTarget = None
-
-	if workTarget is None:
 		workTarget = config.ShareTarget
 	if blkhashn > workTarget:
 		raise RejectedShare('high-hash')
@@ -549,27 +522,26 @@ def checkShare(share):
 	if shareTimestamp > shareTime + 7200:
 		raise RejectedShare('time-too-new')
 
-	if moden:
-		cbpre = workCoinbase
-		cbpreLen = len(cbpre)
-		if coinbase[:cbpreLen] != cbpre:
-			raise RejectedShare('bad-cb-prefix')
+	cbpre = workCoinbase
+	cbpreLen = len(cbpre)
+	if coinbase[:cbpreLen] != cbpre:
+		raise RejectedShare('bad-cb-prefix')
 
-		# Filter out known "I support" flags, to prevent exploits
-		for ff in (b'/P2SH/', b'NOP2SH', b'p2sh/CHV', b'p2sh/NOCHV'):
-			if coinbase.find(ff) > max(-1, cbpreLen - len(ff)):
-				raise RejectedShare('bad-cb-flag')
+	# Filter out known "I support" flags, to prevent exploits
+	for ff in (b'/P2SH/', b'NOP2SH', b'p2sh/CHV', b'p2sh/NOCHV'):
+		if coinbase.find(ff) > max(-1, cbpreLen - len(ff)):
+			raise RejectedShare('bad-cb-flag')
 
-		if len(coinbase) > 100:
-			raise RejectedShare('bad-cb-length')
+	if len(coinbase) > 100:
+		raise RejectedShare('bad-cb-length')
 
-		if shareMerkleRoot != workMerkleTree.withFirst(cbtxn):
-			raise RejectedShare('bad-txnmrklroot')
+	if shareMerkleRoot != workMerkleTree.withFirst(cbtxn):
+		raise RejectedShare('bad-txnmrklroot')
 
-		if len(othertxndata):
-			allowed = assembleBlock(data, txlist)[80:]
-			if allowed != share['blkdata']:
-				raise RejectedShare('bad-txns')
+	if len(othertxndata):
+		allowed = assembleBlock(data, txlist)[80:]
+		if allowed != share['blkdata']:
+			raise RejectedShare('bad-txns')
 
 	if config.DynamicTargetting and username in userStatus:
 		# NOTE: userStatus[username] only doesn't exist across restarts
@@ -584,11 +556,16 @@ def checkShare(share):
 checkShare.logger = logging.getLogger('checkShare')
 
 def logShare(share):
-	if '_origdata' in share:
-		
-		share['solution'] = share['_origdata']
-	else:
-		share['solution'] = b2a_hex(swap32(share['data'])).decode('utf8')
+	#if '_origdata' in share:
+	#	share['solution'] = share['_origdata']
+	#else:
+	#share['solution'] = b2a_hex(swap32(share['data'])).decode('utf8')
+	#if 'target' in share:
+	#	share['solution'] = '%s*%s' % (b2a_hex(share['data'][4:36]).decode('ascii'), target2bdiff(share['target']))
+	#else:
+	#	share['solution'] = 0
+	share['height'] = share['height']
+	share['diff'] = target2bdiff(share['target']) if 'target' in share else 0
 	for i in loggersShare:
 		i.logShare(share)
 
