@@ -56,6 +56,10 @@ class sql:
 				self.db.cursor().execute(stmt, params)
 				break
 			except BaseException as e:
+				try:
+					self.db.close()
+				except:
+					pass
 				reconn += 1
 				_logger.warn('Error(%d) happened when inserting data: %s\n%s, reset db connection' % (reconn, (stmt, params), traceback.format_exc()))
 				if reconn == 1:
