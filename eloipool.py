@@ -203,11 +203,7 @@ if not hasattr(config, 'DelayLogForUpstream'):
 	config.DelayLogForUpstream = False
 
 if not hasattr(config, 'DynamicTargetting'):
-	config.DynamicTargetting = 0
-else:
-	if not hasattr(config, 'DynamicTargetWindow'):
-		config.DynamicTargetWindow = 120
-	config.DynamicTargetGoal *= config.DynamicTargetWindow / 60
+	config.DynamicTargetting = 3
 
 if not hasattr(config, 'GotWorkTarget'):
 	config.GotWorkTarget = 0
@@ -681,6 +677,7 @@ if __name__ == "__main__":
 		BitcoinLink(bcnode, dest=config.UpstreamBitcoindNode)
 
 	stratumsrv = StratumServer()
+	stratumsrv.DynamicTargetting = config.DynamicTargetting
 	stratumsrv.getStratumJob = getStratumJob
 	stratumsrv.getExistingStratumJob = getExistingStratumJob
 	stratumsrv.receiveShare = receiveShare

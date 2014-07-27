@@ -195,26 +195,27 @@ class StratumHandler(networkserver.SocketHandler):
 		#	raise StratumError(24, 'unauthorized-user', False)
 		diffChange = False
 		submitTime = time()
-		if submitTime - self.lastSubmitTime < 1:
-			if self.submitTimeCount:
-				if self.target != self.server.networkTarget:
-					self.target /= 2
-					if self.target < self.server.networkTarget:
-						self.target = self.server.networkTarget
-					bdiff = target2bdiff(self.target)
-					self.sendReply({
-						'id': None,
-						'method': 'mining.set_difficulty',
-						'params': [ bdiff ],
-					})
-					self.logger.info("Adjust difficulty to %s for %s@%s" % (bdiff, username, str(self.addr)))
-					diffChange = True
-				self.submitTimeCount = 0
+		if self.server.DynamicTargetting:
+			if submitTime - self.lastSubmitTime < self.server.DynamicTargetting:
+				if self.submitTimeCount:
+					if self.target != self.server.networkTarget:
+						self.target /= 2
+						if self.target < self.server.networkTarget:
+							self.target = self.server.networkTarget
+						bdiff = target2bdiff(self.target)
+						self.sendReply({
+							'id': None,
+							'method': 'mining.set_difficulty',
+							'params': [ bdiff ],
+						})
+						self.logger.info("Adjust difficulty to %s for %s@%s" % (bdiff, username, str(self.addr)))
+						diffChange = True
+					self.submitTimeCount = 0
+				else:
+					self.submitTimeCount = 1
 			else:
-				self.submitTimeCount = 1
-		else:
-			self.submitTimeCount = 0
-		self.lastSubmitTime = submitTime
+				self.submitTimeCount = 0
+			self.lastSubmitTime = submitTime
 
 		jobid = int(jobid)
 		share = {
@@ -289,7 +290,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.WakeRequest = None
 		self.UpdateTask = None
 		self.networkTarget = None
-		self._PendingQuickUpdates = set()
+		self.DynamicTargetting = 0
 
 	def checkAuthentication(self, username, password):
 		return True
