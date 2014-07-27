@@ -194,6 +194,9 @@ class StratumHandler(networkserver.SocketHandler):
 	def _stratum_mining_submit(self, username, jobid, extranonce2, ntime, nonce):
 		#if username not in self.Usernames:
 		#	raise StratumError(24, 'unauthorized-user', False)
+		jobid = int(jobid)
+		diffChange = False
+
 		submitTime = time()
 		if submitTime - self.lastSubmitTime < 1:
 			if self.submitTimeCount:
@@ -208,6 +211,7 @@ class StratumHandler(networkserver.SocketHandler):
 						'params': [ bdiff ],
 					})
 					self.logger.info("Adjust difficulty to %s for %s@%s" % (bdiff, username, str(self.addr)))
+					diffChange = True
 				self.submitTimeCount = 0
 			else:
 				self.submitTimeCount = 1
@@ -215,7 +219,7 @@ class StratumHandler(networkserver.SocketHandler):
 		share = {
 			'username': username,
 			'remoteHost': self.remoteHost,
-			'jobid': int(jobid),
+			'jobid': jobid,
 			'extranonce1': self.extranonce1,
 			'extranonce2': bytes.fromhex(extranonce2),
 			'ntime': bytes.fromhex(ntime),
@@ -228,12 +232,17 @@ class StratumHandler(networkserver.SocketHandler):
 		}
 		if jobid in self.JobTargets:
 			share['target'] = self.JobTargets[jobid]
+
+		if diffChange:
+			self.JobTargets[jobid] = self.target
+
 		try:
 			self.server.receiveShare(share)
 		except RejectedShare as rej:
 			rej = str(rej)
 			errno = StratumCodes.get(rej, 20)
 			raise StratumError(errno, rej, False)
+
 		return True
 
 	def _stratum_mining_authorize(self, username, password = None):
