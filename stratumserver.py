@@ -135,11 +135,18 @@ class StratumHandler(networkserver.SocketHandler):
 		self.LicenseSent = True
 
 	def sendJob(self):
+		if not len(self.JobTargets):
+			self.sendReply({
+				'id': None,
+				'method': 'mining.set_difficulty',
+				'params': [ target2bdiff(self.target) ],
+			})
+
 		self.logger.debug("sendJob to %s" % str(self.addr))
 		self.push(self.server.JobBytes)
 		if len(self.JobTargets) > 4:
 			self.JobTargets.popitem(False)
-		self.JobTargets[self.server.JobId] = target
+		self.JobTargets[self.server.JobId] = self.target
 
 	def requestStratumUA(self):
 		self.sendReply({
@@ -159,6 +166,7 @@ class StratumHandler(networkserver.SocketHandler):
 		if self.server._Clients.get(self._sid) not in (self, None):
 			del self._sid
 			raise self.server.RaiseRedFlags(RuntimeError('issuing duplicate sessionid'))
+
 		xid = struct.pack('=I', self._sid)  # NOTE: Assumes sessionids are 4 bytes
 		self.extranonce1 = xid
 		xid = b2a_hex(xid).decode('ascii')
@@ -193,11 +201,13 @@ class StratumHandler(networkserver.SocketHandler):
 					self.target /= 2
 					if self.target < self.server.networkTarget:
 						self.target = self.server.networkTarget
+					bdiff = target2bdiff(self.target)
 					self.sendReply({
 						'id': None,
 						'method': 'mining.set_difficulty',
-						'params': [ target2bdiff(self.target) ],
+						'params': [ bdiff ],
 					})
+					self.logger.info("Adjust difficulty to %s for %s@%s" % (bdiff, username, str(self.addr)))
 				self.submitTimeCount = 0
 			else:
 				self.submitTimeCount = 1
@@ -205,7 +215,7 @@ class StratumHandler(networkserver.SocketHandler):
 		share = {
 			'username': username,
 			'remoteHost': self.remoteHost,
-			'jobid': jobid,
+			'jobid': int(jobid),
 			'extranonce1': self.extranonce1,
 			'extranonce2': bytes.fromhex(extranonce2),
 			'ntime': bytes.fromhex(ntime),
@@ -304,7 +314,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 			'id': None,
 			'method': 'mining.notify',
 			'params': [
-				JobId,
+				"%d" % (JobId),
 				b2a_hex(swap32(prevBlock)).decode('ascii'),
 				b2a_hex(txn.data[:pos - len(self.extranonce1null) - 4]).decode('ascii'),
 				b2a_hex(txn.data[pos:]).decode('ascii'),

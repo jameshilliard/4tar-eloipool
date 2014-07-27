@@ -522,7 +522,7 @@ def logShare(share):
 	#else:
 	#	share['solution'] = 0
 	share['height'] = share['height']
-	share['diff'] = target2bdiff(share['target']) if 'target' in share else 0
+	share['diff'] = target2bdiff(share['target'] if 'target' in share else config.ShareTarget)
 	for i in loggersShare:
 		i.logShare(share)
 
