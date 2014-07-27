@@ -51,7 +51,6 @@ class StratumHandler(networkserver.SocketHandler):
 		self.target = self.server.defaultTarget
 		self.server.schedule(self.sendLicenseNotice, time() + 4, errHandler=self)
 		self.set_terminator(b"\n")
-		self.Usernames = {}
 		self.lastSubmitTime = 0
 		self.submitTimeCount = 0
 		self.JobTargets = collections.OrderedDict()
@@ -194,9 +193,7 @@ class StratumHandler(networkserver.SocketHandler):
 	def _stratum_mining_submit(self, username, jobid, extranonce2, ntime, nonce):
 		#if username not in self.Usernames:
 		#	raise StratumError(24, 'unauthorized-user', False)
-		jobid = int(jobid)
 		diffChange = False
-
 		submitTime = time()
 		if submitTime - self.lastSubmitTime < 1:
 			if self.submitTimeCount:
@@ -215,7 +212,11 @@ class StratumHandler(networkserver.SocketHandler):
 				self.submitTimeCount = 0
 			else:
 				self.submitTimeCount = 1
+		else:
+			self.submitTimeCount = 0
 		self.lastSubmitTime = submitTime
+
+		jobid = int(jobid)
 		share = {
 			'username': username,
 			'remoteHost': self.remoteHost,
@@ -227,14 +228,9 @@ class StratumHandler(networkserver.SocketHandler):
 			'height': self.server.Height,
 			'time': submitTime,
 			#'userAgent': self.UA,
-			#'submitProtocol': 'stratum',
-			#'solution': '%s' % self.lastBDiff,
 		}
 		if jobid in self.JobTargets:
 			share['target'] = self.JobTargets[jobid]
-
-		if diffChange:
-			self.JobTargets[jobid] = self.target
 
 		try:
 			self.server.receiveShare(share)
@@ -242,6 +238,9 @@ class StratumHandler(networkserver.SocketHandler):
 			rej = str(rej)
 			errno = StratumCodes.get(rej, 20)
 			raise StratumError(errno, rej, False)
+
+		if diffChange:
+			self.JobTargets[jobid] = self.target
 
 		return True
 
@@ -251,7 +250,7 @@ class StratumHandler(networkserver.SocketHandler):
 		except:
 			valid = False
 		if valid:
-			self.Usernames[username] = None
+			#self.Usernames[username] = None
 			self.changeTask(self.requestStratumUA, 0)
 		return valid
 
@@ -355,29 +354,6 @@ class StratumServer(networkserver.AsyncSocketServer):
 
 		self.UpdateTask = self.schedule(self.updateJob, time() + 55)
 
-	def doQuickUpdate(self):
-		PQU = self._PendingQuickUpdates
-		self._PendingQuickUpdates = set()
-		QUC = 0
-		for ic in list(self._Clients.values()):
-			if PQU.intersection(ic.Usernames):
-				if self.JobId in ic.JobTargets:
-					self.updateJobOnly(wantClear=True, forceClean=True)
-				try:
-					ic.sendJob()
-					QUC += 1
-				except socket.error:
-					# Ignore socket errors; let the main event loop take care of them later
-					pass
-				except:
-					self.logger.debug('Error sending quickupdate job:\n' + traceback.format_exc())
-		if QUC:
-			self.logger.debug("Quickupdated %d clients" % (QUC,))
-
-	def quickDifficultyUpdate(self, username):
-		self._PendingQuickUpdates.add(username)
-		self.schedule(self.doQuickUpdate, time())
-
 	def pre_schedule(self):
 		if self.WakeRequest:
 			self._wakeNodes()
@@ -404,6 +380,3 @@ class StratumServer(networkserver.AsyncSocketServer):
 				self.logger.debug('Error sending new job:\n' + traceback.format_exc())
 
 		self.logger.debug('New job sent to %d clients in %.3f seconds' % (OC, time() - now))
-
-	def getTarget(*a, **ka):
-		return None
