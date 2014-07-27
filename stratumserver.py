@@ -148,7 +148,7 @@ class StratumHandler(networkserver.SocketHandler):
 				],
 			})
 			self.lastBDiff = bdiff
-		self.logger.info("sendJob to %s" % str(self.addr))
+		self.logger.debug("sendJob to %s" % str(self.addr))
 		self.push(self.server.JobBytes)
 		if len(self.JobTargets) > 4:
 			self.JobTargets.popitem(False)
@@ -197,8 +197,8 @@ class StratumHandler(networkserver.SocketHandler):
 		super().close()
 
 	def _stratum_mining_submit(self, username, jobid, extranonce2, ntime, nonce):
-		if username not in self.Usernames:
-			raise StratumError(24, 'unauthorized-user', False)
+		#if username not in self.Usernames:
+		#	raise StratumError(24, 'unauthorized-user', False)
 		share = {
 			'username': username,
 			'remoteHost': self.remoteHost,
@@ -289,7 +289,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 			self.logger.info('Coinbase small enough for stratum again: re-enabling')
 
 		txn = deepcopy(merkleTree.data[0])
-		cb += self.extranonce1null + b'Eloi'
+		cb += self.extranonce1null + b'4tar'
 		txn.setCoinbase(cb)
 		txn.assemble()
 		pos = txn.data.index(cb) + len(cb)

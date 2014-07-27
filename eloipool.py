@@ -76,14 +76,14 @@ def RaiseRedFlags(reason):
 
 from bitcoin.node import BitcoinLink, BitcoinNode
 bcnode = BitcoinNode(config.UpstreamNetworkId)
-bcnode.userAgent += b'Eloipool:0.1/'
+bcnode.userAgent += b'37pool:0.1/'
 bcnode.newBlock = lambda blkhash: MM.updateMerkleTree()
 
 import jsonrpc
 
 try:
 	import jsonrpc.authproxy
-	jsonrpc.authproxy.USER_AGENT = 'Eloipool/0.1'
+	jsonrpc.authproxy.USER_AGENT = '37pool/0.1'
 except:
 	pass
 
@@ -211,12 +211,6 @@ else:
 		config.DynamicTargetWindow = 120
 	config.DynamicTargetGoal *= config.DynamicTargetWindow / 60
 
-def submitGotwork(info):
-	try:
-		gotwork.gotwork(info)
-	except:
-		checkShare.logger.warning('Failed to submit gotwork\n' + traceback.format_exc())
-
 if not hasattr(config, 'GotWorkTarget'):
 	config.GotWorkTarget = 0
 
@@ -293,13 +287,6 @@ def TopTargets(n = 0x10):
 	for k in tmp[-n:]:
 		tgt = userStatus[k][0]
 		print('%-34s %064x %3d' % (k, tgt, t2d(tgt)))
-
-def RegisterWork(username, wli, wld, RequestedTarget = None):
-	now = time()
-	target = getTarget(username, now, RequestedTarget=RequestedTarget)
-	wld = tuple(wld) + (target,)
-	workLog.setdefault(username, {})[wli] = (wld, now)
-	return target or config.ShareTarget
 
 def getStratumJob(jobid, wantClear = False):
 	MC = MM.getMC(wantClear)
@@ -389,24 +376,6 @@ def blockSubmissionThread(payload, blkhash, share):
 			logShare(share)
 blockSubmissionThread.logger = logging.getLogger('blockSubmission')
 
-def checkData(share):
-	data = share['data']
-	data = data[:80]
-	(prevBlock, height, bits) = MM.currentBlock
-	sharePrevBlock = data[4:36]
-	if sharePrevBlock != prevBlock:
-		if sharePrevBlock == MM.lastBlock[0]:
-			raise RejectedShare('stale-prevblk')
-		raise RejectedShare('bad-prevblk')
-
-	if data[72:76] != bits:
-		raise RejectedShare('bad-diffbits')
-
-	# Note that we should accept miners reducing version to 1 if they don't understand 2 yet
-	# FIXME: When the supermajority is upgraded to version 2, stop accepting 1!
-	if data[1:4] != b'\0\0\0' or data[0] > 2:
-		raise RejectedShare('bad-version')
-
 def buildStratumData(share, merkleroot):
 	(prevBlock, height, bits) = MM.currentBlock
 
@@ -472,8 +441,8 @@ def checkShare(share):
 	blkhashn = LEhash2int(blkhash)
 
 	global networkTarget
-	#logfunc = getattr(checkShare.logger, 'info' if blkhashn <= networkTarget else 'debug')
-	logfunc = checkShare.logger.info
+	logfunc = getattr(checkShare.logger, 'info' if blkhashn <= networkTarget else 'debug')
+	#logfunc = checkShare.logger.info
 	logfunc('BLKHASH: %64x' % (blkhashn,))
 	logfunc(' TARGET: %64x' % (networkTarget,))
 
