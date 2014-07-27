@@ -48,10 +48,12 @@ class StratumHandler(networkserver.SocketHandler):
 		super().__init__(*a, **ka)
 		self.remoteHost = self.addr[0]
 		self.changeTask(None)
+		self.target = self.server.defaultTarget
 		self.server.schedule(self.sendLicenseNotice, time() + 4, errHandler=self)
 		self.set_terminator(b"\n")
 		self.Usernames = {}
-		self.lastBDiff = None
+		self.lastSubmitTime = 0
+		self.submitTimeCount = 0
 		self.JobTargets = collections.OrderedDict()
 		self.UA = None
 		self.LicenseSent = agplcompliance._SourceFiles is None
@@ -133,21 +135,6 @@ class StratumHandler(networkserver.SocketHandler):
 		self.LicenseSent = True
 
 	def sendJob(self):
-		target = self.server.defaultTarget
-		if len(self.Usernames) == 1:
-			dtarget = self.server.getTarget(next(iter(self.Usernames)), time())
-			if not dtarget is None:
-				target = dtarget
-		bdiff = target2bdiff(target)
-		if self.lastBDiff != bdiff:
-			self.sendReply({
-				'id': None,
-				'method': 'mining.set_difficulty',
-				'params': [
-					bdiff
-				],
-			})
-			self.lastBDiff = bdiff
 		self.logger.debug("sendJob to %s" % str(self.addr))
 		self.push(self.server.JobBytes)
 		if len(self.JobTargets) > 4:
@@ -199,6 +186,22 @@ class StratumHandler(networkserver.SocketHandler):
 	def _stratum_mining_submit(self, username, jobid, extranonce2, ntime, nonce):
 		#if username not in self.Usernames:
 		#	raise StratumError(24, 'unauthorized-user', False)
+		submitTime = time()
+		if submitTime - self.lastSubmitTime < 1:
+			if self.submitTimeCount:
+				if self.target != self.server.networkTarget:
+					self.target /= 2
+					if self.target < self.server.networkTarget:
+						self.target = self.server.networkTarget
+					self.sendReply({
+						'id': None,
+						'method': 'mining.set_difficulty',
+						'params': [ target2bdiff(self.target) ],
+					})
+				self.submitTimeCount = 0
+			else:
+				self.submitTimeCount = 1
+		self.lastSubmitTime = submitTime
 		share = {
 			'username': username,
 			'remoteHost': self.remoteHost,
@@ -208,6 +211,7 @@ class StratumHandler(networkserver.SocketHandler):
 			'ntime': bytes.fromhex(ntime),
 			'nonce': bytes.fromhex(nonce),
 			'height': self.server.Height,
+			'time': submitTime,
 			#'userAgent': self.UA,
 			#'submitProtocol': 'stratum',
 			#'solution': '%s' % self.lastBDiff,
@@ -248,6 +252,7 @@ class StratumHandler(networkserver.SocketHandler):
 			s[1] = s[1].decode('latin-1')
 		return s
 
+
 class StratumServer(networkserver.AsyncSocketServer):
 	logger = logging.getLogger('StratumServer')
 
@@ -261,19 +266,18 @@ class StratumServer(networkserver.AsyncSocketServer):
 		super().__init__(*a, **ka)
 
 		self._Clients = {}
-		self._JobId = 0
-		self.JobId = '%d' % (time(),)
+		self.JobId = 0
 		self.Height = 0
 		self.WakeRequest = None
 		self.UpdateTask = None
+		self.networkTarget = None
 		self._PendingQuickUpdates = set()
 
 	def checkAuthentication(self, username, password):
 		return True
 
 	def updateJobOnly(self, wantClear = False, forceClean = False):
-		self._JobId += 1
-		JobId = '%d %d' % (time(), self._JobId)
+		JobId = self.JobId + 1
 		(MC, wld) = self.getStratumJob(JobId, wantClear=wantClear)
 		(height, merkleTree, cb, prevBlock, bits) = MC[:5]
 
@@ -315,12 +319,15 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.JobId = JobId
 		self.Height = height
 
-	def updateJob(self, wantClear = False):
+	def updateJob(self, wantClear = False, networkTarget = None):
 		if self.UpdateTask:
 			try:
 				self.rmSchedule(self.UpdateTask)
 			except:
 				pass
+
+		if networkTarget:
+			self.networkTarget = networkTarget
 
 		self.updateJobOnly(wantClear=wantClear)
 

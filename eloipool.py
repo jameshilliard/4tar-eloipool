@@ -151,7 +151,7 @@ def blockChanged():
 		global DupeShareHACK
 		DupeShareHACK = {}
 		workLog.clear()
-	stratumsrv.updateJob(wantClear=True)
+	stratumsrv.updateJob(wantClear=True, networkTarget=networkTarget)
 
 
 from time import sleep, time
@@ -276,18 +276,6 @@ def getTarget(username, now, DTMode = None, RequestedTarget = None):
 	return target
 getTarget.logger = logging.getLogger('getTarget')
 
-def TopTargets(n = 0x10):
-	tmp = list(k for k, v in userStatus.items() if not v[0] is None)
-	tmp.sort(key=lambda k: -userStatus[k][0])
-	tmp2 = {}
-	def t2d(t):
-		if t not in tmp2:
-			tmp2[t] = target2pdiff(t)
-		return tmp2[t]
-	for k in tmp[-n:]:
-		tgt = userStatus[k][0]
-		print('%-34s %064x %3d' % (k, tgt, t2d(tgt)))
-
 def getStratumJob(jobid, wantClear = False):
 	MC = MM.getMC(wantClear)
 	(dummy, merkleTree, coinbase, prevBlock, bits) = MC[:5]
@@ -406,7 +394,7 @@ def checkShare(share):
 		# We haven't yet sent any stratum work for this block
 		raise RejectedShare('unknown-work')
 
-	shareTime = share['time'] = time()
+	shareTime = share['time']
 	username = share['username']
 
 	# Stratum
