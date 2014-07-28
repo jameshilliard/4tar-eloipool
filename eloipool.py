@@ -205,8 +205,11 @@ if not hasattr(config, 'DelayLogForUpstream'):
 if not hasattr(config, 'DynamicTargetting'):
 	config.DynamicTargetting = 3
 
-if not hasattr(config, 'GotWorkTarget'):
-	config.GotWorkTarget = 0
+if not hasattr(config, 'GetTxnsInterval'):
+	config.GetTxnsInterval = 10
+
+#if not hasattr(config, 'GotWorkTarget'):
+#	config.GotWorkTarget = 0
 
 def getStratumJob(jobid, wantClear = False):
 	MC = MM.getMC(wantClear)
@@ -677,14 +680,15 @@ if __name__ == "__main__":
 		BitcoinLink(bcnode, dest=config.UpstreamBitcoindNode)
 
 	stratumsrv = StratumServer()
+	stratumsrv.defaultTarget = config.ShareTarget
 	stratumsrv.DynamicTargetting = config.DynamicTargetting
+	stratumsrv.GetTxnsInterval = config.GetTxnsInterval
 	stratumsrv.getStratumJob = getStratumJob
 	stratumsrv.getExistingStratumJob = getExistingStratumJob
 	stratumsrv.receiveShare = receiveShare
 	stratumsrv.RaiseRedFlags = RaiseRedFlags
-	stratumsrv.defaultTarget = config.ShareTarget
 	stratumsrv.IsJobValid = IsJobValid
-	stratumsrv.checkAuthentication = checkAuthentication
+	#stratumsrv.checkAuthentication = checkAuthentication
 	if not hasattr(config, 'StratumAddresses'):
 		config.StratumAddresses = ()
 	for a in config.StratumAddresses:

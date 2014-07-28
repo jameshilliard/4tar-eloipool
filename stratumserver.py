@@ -52,6 +52,7 @@ class StratumHandler(networkserver.SocketHandler):
 		self.server.schedule(self.sendLicenseNotice, time() + 4, errHandler=self)
 		self.set_terminator(b"\n")
 		self.lastSubmitTime = 0
+		self.lastGetTxnsJobId = 0
 		self.submitTimeCount = 0
 		self.JobTargets = collections.OrderedDict()
 		self.UA = None
@@ -246,18 +247,29 @@ class StratumHandler(networkserver.SocketHandler):
 		return True
 
 	def _stratum_mining_authorize(self, username, password = None):
-		try:
-			valid = self.server.checkAuthentication(username, password)
-		except:
-			valid = False
-		if valid:
+		self.changeTask(self.requestStratumUA, 0)
+		return True
+		#try:
+		#	valid = self.server.checkAuthentication(username, password)
+		#except:
+		#	valid = False
+		#if valid:
 			#self.Usernames[username] = None
-			self.changeTask(self.requestStratumUA, 0)
-		return valid
+		#	self.changeTask(self.requestStratumUA, 0)
+		#return valid
 
 	def _stratum_mining_get_transactions(self, jobid):
+		jobid = int(jobid)
+		if self.lastGetTxnsJobId and (
+			jobid != self.server.JobId or
+			jobid < self.lastGetTxnsJobId or
+			jobid - self.lastGetTxnsJobId < self.server.GetTxnsInterval
+		):
+			raise StratumError(25, 'too-frequent-txn-request', False)
+		self.lastGetTxnsJobId = jobid
+
 		try:
-			(MC, wld) = self.server.getExistingStratumJob(int(jobid))
+			(MC, wld) = self.server.getExistingStratumJob(jobid)
 		except KeyError as e:
 			e.StratumQuiet = True
 			raise
@@ -291,6 +303,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.UpdateTask = None
 		self.networkTarget = None
 		self.DynamicTargetting = 0
+		self.GetTxnsInterval = 0
 
 	def checkAuthentication(self, username, password):
 		return True
