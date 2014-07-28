@@ -257,7 +257,7 @@ class StratumHandler(networkserver.SocketHandler):
 
 	def _stratum_mining_get_transactions(self, jobid):
 		try:
-			(MC, wld) = self.server.getExistingStratumJob(jobid)
+			(MC, wld) = self.server.getExistingStratumJob(int(jobid))
 		except KeyError as e:
 			e.StratumQuiet = True
 			raise
