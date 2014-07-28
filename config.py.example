@@ -26,6 +26,9 @@ ShareTarget = 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 # n = minimal interval (in seconds) between receiving shares
 DynamicTargetting = 3
 
+# Minimal get_transactions job interval
+GetTxnsInterval = 10
+
 # Minimum and maximum of merkle roots to keep queued
 WorkQueueSizeRegular = (0x100, 0x1000)
 
