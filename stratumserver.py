@@ -52,6 +52,7 @@ class StratumHandler(networkserver.SocketHandler):
 		self.server.schedule(self.sendLicenseNotice, time() + 4, errHandler=self)
 		self.set_terminator(b"\n")
 		self.lastSubmitTime = 0
+		self.lastSubmitJobId = 0
 		self.lastGetTxnsJobId = 0
 		self.submitTimeCount = 0
 		self.JobTargets = collections.OrderedDict()
@@ -218,7 +219,7 @@ class StratumHandler(networkserver.SocketHandler):
 				self.submitTimeCount = 0
 			self.lastSubmitTime = submitTime
 
-		jobid = int(jobid)
+		self.lastSubmitJobId = jobid = int(jobid)
 		share = {
 			'username': username,
 			'remoteHost': self.remoteHost,
@@ -260,12 +261,10 @@ class StratumHandler(networkserver.SocketHandler):
 
 	def _stratum_mining_get_transactions(self, jobid):
 		jobid = int(jobid)
-		if self.lastGetTxnsJobId and (
-			jobid != self.server.JobId or
-			jobid < self.lastGetTxnsJobId or
-			jobid - self.lastGetTxnsJobId < self.server.GetTxnsInterval
-		):
-			raise StratumError(25, 'too-frequent-txn-request', False)
+		if jobid != self.server.JobId or jobid == self.lastSubmitJobId:
+			raise StratumError(25, 'stale-txn-request', False)
+		if self.lastGetTxnsJobId and jobid - self.lastGetTxnsJobId < self.server.GetTxnsInterval:
+			raise StratumError(26, 'too-frequent-txn-request', False)
 		self.lastGetTxnsJobId = jobid
 
 		try:
