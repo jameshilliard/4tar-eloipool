@@ -244,15 +244,16 @@ def poolWorker(wl, ss):
 				i = 0
 
 				now = time()
-				pruned = 0
+				total = pruned = 0
 				for username in wl:
 					userwork = wl[username]
 					for wli in tuple(userwork.keys()):
+						total += 1
 						if now > userwork[wli][1] + 120:
 							del userwork[wli]
 							pruned += 1
 				if pruned:
-					poolWorker.logger.info('Pruned %d jobs' % (pruned,))
+					poolWorker.logger.info('Pruned %d in %d jobs' % (pruned, total))
 		except:
 			poolWorker.logger.error(traceback.format_exc())
 poolWorker.logger = logging.getLogger('poolWorker')

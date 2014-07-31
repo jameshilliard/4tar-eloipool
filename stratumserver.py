@@ -69,7 +69,7 @@ class StratumHandler(networkserver.SocketHandler):
 		if not inbuf:
 			return
 
-		self.logger.debug("Get input: %s" % inbuf)
+		self.logger.debug("Get input from %s: %s" % (str(self.addr), inbuf))
 
 		try:
 			rpc = json.loads(inbuf)
