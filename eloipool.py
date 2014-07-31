@@ -202,8 +202,11 @@ if hasattr(config, 'GotWorkURI'):
 if not hasattr(config, 'DelayLogForUpstream'):
 	config.DelayLogForUpstream = False
 
-if not hasattr(config, 'DynamicTargetting'):
-	config.DynamicTargetting = 3
+if not hasattr(config, 'MinSubmitInterval'):
+	config.MinSubmitInterval = 3
+
+if not hasattr(config, 'MaxSubmitInterval'):
+	config.MaxSubmitInterval = 3
 
 if not hasattr(config, 'GetTxnsInterval'):
 	config.GetTxnsInterval = 10
@@ -395,16 +398,15 @@ def checkShare(share):
 			share['upstreamResult'] = True
 		MM.updateBlock(blkhash)
 
-	if 'target' in share:
-		workTarget = share['target']
-	elif len(wld) > 6:
-		workTarget = wld[6]
-	else:
-		workTarget = config.ShareTarget
+	if not 'target' in share:
+		raise RejectedShare('stale-work')
+	workTarget = share['target']
 	if blkhashn > workTarget:
-		raise RejectedShare('high-hash')
+		if blkhashn > config.ShareTarget or blkhashn > 2 * workTarget:
+			raise RejectedShare('high-hash')
+		workTarget *= 2
 	share['target'] = workTarget
-	share['_targethex'] = '%064x' % (workTarget,)
+	#share['_targethex'] = '%064x' % (workTarget,)
 
 	shareTimestamp = unpack('<L', data[68:72])[0]
 	if shareTime < issueT - 120:
@@ -681,7 +683,8 @@ if __name__ == "__main__":
 
 	stratumsrv = StratumServer()
 	stratumsrv.defaultTarget = config.ShareTarget
-	stratumsrv.DynamicTargetting = config.DynamicTargetting
+	stratumsrv.MinSubmitInterval = config.MinSubmitInterval
+	stratumsrv.MaxSubmitInterval = config.MaxSubmitInterval
 	stratumsrv.GetTxnsInterval = config.GetTxnsInterval
 	stratumsrv.getStratumJob = getStratumJob
 	stratumsrv.getExistingStratumJob = getExistingStratumJob

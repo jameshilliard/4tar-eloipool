@@ -23,8 +23,9 @@ ShareTarget = 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 # Automatically adjust targets per connection
 # 0 = disabled
-# n = minimal interval (in seconds) between receiving shares
-DynamicTargetting = 3
+# n = minimal/maximal interval (in seconds) between receiving shares
+MinSubmitInterval = 3
+MaxSubmitInterval = 100
 
 # Minimal get_transactions job interval
 GetTxnsInterval = 10

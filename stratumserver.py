@@ -197,27 +197,41 @@ class StratumHandler(networkserver.SocketHandler):
 		#	raise StratumError(24, 'unauthorized-user', False)
 		diffChange = False
 		submitTime = time()
-		if self.server.DynamicTargetting:
-			if submitTime - self.lastSubmitTime < self.server.DynamicTargetting:
-				if self.submitTimeCount:
+		if self.server.MinSubmitInterval:
+			if submitTime - self.lastSubmitTime < self.server.MinSubmitInterval:
+				if self.submitTimeCount > 0:
 					if self.target != self.server.networkTarget:
 						self.target /= 2
 						if self.target < self.server.networkTarget:
 							self.target = self.server.networkTarget
-						bdiff = target2bdiff(self.target)
-						self.sendReply({
-							'id': None,
-							'method': 'mining.set_difficulty',
-							'params': [ bdiff ],
-						})
-						self.logger.info("Adjust difficulty to %s for %s@%s" % (bdiff, username, str(self.addr)))
+						self.logger.info("Increase difficulty to %s for %s@%s" % (bdiff, username, str(self.addr)))
 						diffChange = True
 					self.submitTimeCount = 0
 				else:
 					self.submitTimeCount = 1
-			else:
+			elif self.submitTimeCount > 0:
 				self.submitTimeCount = 0
-			self.lastSubmitTime = submitTime
+		if not diffChange and self.server.MaxSubmitInterval:
+			if submitTime - self.lastSubmitTime > self.server.MaxSubmitInterval:
+				if self.submitTimeCount < 0:
+					if self.target != self.server.defaultTarget:
+						self.target *= 2
+						if self.target > self.server.defaultTarget:
+							self.target = self.server.defaultTarget
+						self.logger.info("Decrease difficulty to %s for %s@%s" % (bdiff, username, str(self.addr)))
+						diffChange = True
+					self.submitTimeCount = 0
+				else:
+					self.submitTimeCount = -1
+			elif self.submitTimeCount < 0:
+				self.submitTimeCount = 0
+		if diffChange:
+			self.sendReply({
+				'id': None,
+				'method': 'mining.set_difficulty',
+				'params': [ target2bdiff(self.target) ],
+			})
+		self.lastSubmitTime = submitTime
 
 		self.lastSubmitJobId = jobid = int(jobid)
 		share = {
@@ -262,9 +276,9 @@ class StratumHandler(networkserver.SocketHandler):
 	def _stratum_mining_get_transactions(self, jobid):
 		jobid = int(jobid)
 		if jobid != self.server.JobId or jobid == self.lastSubmitJobId:
-			raise StratumError(25, 'stale-txn-request', False)
+			raise StratumError(25, 'stale-txlist-request', False)
 		if self.lastGetTxnsJobId and jobid - self.lastGetTxnsJobId < self.server.GetTxnsInterval:
-			raise StratumError(26, 'too-frequent-txn-request', False)
+			raise StratumError(26, 'too-frequent-txlist-request', False)
 		self.lastGetTxnsJobId = jobid
 
 		try:
@@ -301,7 +315,8 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.WakeRequest = None
 		self.UpdateTask = None
 		self.networkTarget = None
-		self.DynamicTargetting = 0
+		self.MinSubmitInterval = 0
+		self.MaxSubmitInterval = 0
 		self.GetTxnsInterval = 0
 
 	def checkAuthentication(self, username, password):
@@ -346,7 +361,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 				forceClean or not self.IsJobValid(self.JobId)
 			],
 		}).encode('ascii') + b"\n"
-		self.logger.info("Update Job to: %s" % (self.JobBytes))
+		self.logger.debug("Update Job to: %s" % (self.JobBytes))
 		self.JobId = JobId
 		self.Height = height
 
