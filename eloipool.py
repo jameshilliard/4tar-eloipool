@@ -26,39 +26,71 @@ configmod = 'config'
 if not args.config is None:
 	configmod = 'config_%s' % (args.config,)
 
-def loadConfig(config, confMod, update = True):
-	__import__(confMod)
-	conf = importlib.import_module(confMod)
+config = None
+def loadConfig(confMod, init = False):
+	global config
 
-	if not hasattr(conf, 'ServerName'):
-		conf.ServerName = '37pool.com'
-	#gotwork = None
-	#if hasattr(conf, 'GotWorkURI'):
-	#	gotwork = jsonrpc.ServiceProxy(conf.GotWorkURI)
-	#if not hasattr(conf, 'GotWorkTarget'):
-	#	conf.GotWorkTarget = 0
-	if not hasattr(conf, 'ShareTarget'):
-		conf.ShareTarget = 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-	if not hasattr(conf, 'DelayLogForUpstream'):
-		conf.DelayLogForUpstream = False
-	if not hasattr(conf, 'MinSubmitInterval'):
-		conf.MinSubmitInterval = 3
-	if not hasattr(conf, 'MaxSubmitInterval'):
-		conf.MaxSubmitInterval = 100
-	if not hasattr(conf, 'GetTxnsInterval'):
-		conf.GetTxnsInterval = 10
+	rl = [ 0, 0, 0, 0 ]
 
-	if not update:
-		return conf
+	if init:
+		__import__(confMod)
+		config = importlib.import_module(confMod)
 
-	config.ServerName = conf.ServerName
-	config.ShareTarget = conf.ShareTarget
-	config.DelayLogForUpstream = conf.DelayLogForUpstream
-	config.MinSubmitInterval = conf.MinSubmitInterval
-	config.MaxSubmitInterval = conf.MaxSubmitInterval
-	config.GetTxnsInterval = conf.GetTxnsInterval
+		if not hasattr(config, 'ServerName'):
+			config.ServerName = '37pool.com'
+		#gotwork = None
+		#if hasattr(config, 'GotWorkURI'):
+		#	gotwork = jsonrpc.ServiceProxy(config.GotWorkURI)
+		#if not hasattr(config, 'GotWorkTarget'):
+		#	config.GotWorkTarget = 0
+		if not hasattr(config, 'DelayLogForUpstream'):
+			config.DelayLogForUpstream = False
 
-config = loadConfig(None, configmod, False)
+		rl[0] = rl[1] = rl[2] = rl[3] = 1
+	else:
+		r = 0
+
+		conf = open(confMod + ".py", 'r')
+		try:
+			for line in conf:
+				a = line.split('=')
+				if len(a) == 2:
+					a[0] = a[0].strip()
+					if a[0] == "ShareTarget":
+						r += 1
+						rl[0] = 1
+						config.ShareTarget = int(a[1].strip(),16)
+					elif a[0] == "MinSubmitInterval":
+						r += 1
+						rl[1] = 1
+						config.MinSubmitInterval = int(a[1].strip())
+					elif a[0] == "MaxSubmitInterval":
+						r += 1
+						rl[2] = 1
+						config.MaxSubmitInterval = int(a[1].strip())
+					elif a[0] == "GetTxnsInterval":
+						r += 1
+						rl[3] = 1
+						config.GetTxnsInterval = int(a[1].strip())
+
+					if r == 4:
+						break
+		finally:
+			conf.close()
+
+		if r == 4:
+			return
+
+	if not rl[0] or not hasattr(config, 'ShareTarget'):
+		config.ShareTarget = 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+	if not rl[1] or not hasattr(config, 'MinSubmitInterval'):
+		config.MinSubmitInterval = 3
+	if not rl[2] or not hasattr(config, 'MaxSubmitInterval'):
+		config.MaxSubmitInterval = 100
+	if not rl[3] or not hasattr(config, 'GetTxnsInterval'):
+		config.GetTxnsInterval = 10
+
+loadConfig(configmod, True)
 
 import logging
 import logging.handlers
@@ -186,8 +218,12 @@ def poolWorker(wl, ss):
 		try:
 			sleep(5)
 
+#			poolWorker.logger.debug("poolWorker is working! i=%d, cf.(mi,ma,ti)=(%d,%d,%d), ss.(mi,ma,ti)=(%d,%d,%d)" % (
+#				i, config.MinSubmitInterval, config.MaxSubmitInterval, config.GetTxnsInterval,
+#				ss.MinSubmitInterval, ss.MaxSubmitInterval, ss.GetTxnsInterval))
+
 			refreshConf = ""
-			loadConfig(config, configmod)
+			loadConfig(configmod)
 			if ss.defaultTarget != config.ShareTarget:
 				refreshConf = "defaultTarget"
 				ss.defaultTarget = config.ShareTarget
@@ -200,7 +236,7 @@ def poolWorker(wl, ss):
 			if ss.GetTxnsInterval != config.GetTxnsInterval:
 				refreshConf += (", " if refreshConf else "") + "GetTxnsInterval"
 				ss.GetTxnsInterval = config.GetTxnsInterval
-			if 	refreshConf:
+			if refreshConf:
 				poolWorker.logger.info('Refresh config item %s' % (refreshConf,))
 
 			i += 1
@@ -216,7 +252,7 @@ def poolWorker(wl, ss):
 							del userwork[wli]
 							pruned += 1
 				if pruned:
-					poolWorker.logger.debug('Pruned %d jobs' % (pruned,))
+					poolWorker.logger.info('Pruned %d jobs' % (pruned,))
 		except:
 			poolWorker.logger.error(traceback.format_exc())
 poolWorker.logger = logging.getLogger('poolWorker')
