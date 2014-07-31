@@ -59,7 +59,7 @@ def loadConfig(confMod, init = False):
 					if a[0] == "ShareTarget":
 						r += 1
 						rl[0] = 1
-						config.ShareTarget = int(a[1].strip(),16)
+						config.ShareTarget = int(a[1].strip(), 16)
 					elif a[0] == "MinSubmitInterval":
 						r += 1
 						rl[1] = 1
@@ -389,7 +389,7 @@ def IsJobValid(wli, wluser = None):
 	return True
 
 def checkShare(share):
-	checkShare.logger.info("Share: %s" % (share))
+	checkShare.logger.debug("Share: %s" % (share))
 
 	if None not in workLog:
 		# We haven't yet sent any stratum work for this block

@@ -195,8 +195,8 @@ class StratumHandler(networkserver.SocketHandler):
 	def _stratum_mining_submit(self, username, jobid, extranonce2, ntime, nonce):
 		#if username not in self.Usernames:
 		#	raise StratumError(24, 'unauthorized-user', False)
-		diffChange = False
 		submitTime = time()
+		newBdiff = 0
 		if self.server.MinSubmitInterval:
 			if submitTime - self.lastSubmitTime < self.server.MinSubmitInterval:
 				if self.submitTimeCount > 0:
@@ -204,32 +204,32 @@ class StratumHandler(networkserver.SocketHandler):
 						self.target /= 2
 						if self.target < self.server.networkTarget:
 							self.target = self.server.networkTarget
-						self.logger.info("Increase difficulty to %s for %s@%s" % (bdiff, username, str(self.addr)))
-						diffChange = True
+						newBdiff = target2bdiff(self.target)
+						self.logger.info("Increase difficulty to %s for %s@%s" % (newBdiff, username, str(self.addr)))
 					self.submitTimeCount = 0
 				else:
 					self.submitTimeCount = 1
 			elif self.submitTimeCount > 0:
 				self.submitTimeCount = 0
-		if not diffChange and self.server.MaxSubmitInterval:
+		if not newBdiff and self.server.MaxSubmitInterval:
 			if submitTime - self.lastSubmitTime > self.server.MaxSubmitInterval:
 				if self.submitTimeCount < 0:
 					if self.target != self.server.defaultTarget:
 						self.target *= 2
 						if self.target > self.server.defaultTarget:
 							self.target = self.server.defaultTarget
-						self.logger.info("Decrease difficulty to %s for %s@%s" % (bdiff, username, str(self.addr)))
-						diffChange = True
+						newBdiff = target2bdiff(self.target)
+						self.logger.info("Decrease difficulty to %s for %s@%s" % (newBdiff, username, str(self.addr)))
 					self.submitTimeCount = 0
 				else:
 					self.submitTimeCount = -1
 			elif self.submitTimeCount < 0:
 				self.submitTimeCount = 0
-		if diffChange:
+		if newBdiff:
 			self.sendReply({
 				'id': None,
 				'method': 'mining.set_difficulty',
-				'params': [ target2bdiff(self.target) ],
+				'params': [ newBdiff ],
 			})
 		self.lastSubmitTime = submitTime
 
@@ -256,7 +256,7 @@ class StratumHandler(networkserver.SocketHandler):
 			errno = StratumCodes.get(rej, 20)
 			raise StratumError(errno, rej, False)
 
-		if diffChange:
+		if newBdiff:
 			self.JobTargets[jobid] = self.target
 
 		return True
