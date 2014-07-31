@@ -25,15 +25,40 @@ args = argparser.parse_args()
 configmod = 'config'
 if not args.config is None:
 	configmod = 'config_%s' % (args.config,)
-__import__(configmod)
-config = importlib.import_module(configmod)
 
-if not hasattr(config, 'ServerName'):
-	config.ServerName = 'Unnamed Eloipool'
+def loadConfig(config, confMod, update = True):
+	__import__(confMod)
+	conf = importlib.import_module(confMod)
 
-if not hasattr(config, 'ShareTarget'):
-	config.ShareTarget = 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+	if not hasattr(conf, 'ServerName'):
+		conf.ServerName = '37pool.com'
+	#gotwork = None
+	#if hasattr(conf, 'GotWorkURI'):
+	#	gotwork = jsonrpc.ServiceProxy(conf.GotWorkURI)
+	#if not hasattr(conf, 'GotWorkTarget'):
+	#	conf.GotWorkTarget = 0
+	if not hasattr(conf, 'ShareTarget'):
+		conf.ShareTarget = 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+	if not hasattr(conf, 'DelayLogForUpstream'):
+		conf.DelayLogForUpstream = False
+	if not hasattr(conf, 'MinSubmitInterval'):
+		conf.MinSubmitInterval = 3
+	if not hasattr(conf, 'MaxSubmitInterval'):
+		conf.MaxSubmitInterval = 100
+	if not hasattr(conf, 'GetTxnsInterval'):
+		conf.GetTxnsInterval = 10
 
+	if not update:
+		return conf
+
+	config.ServerName = conf.ServerName
+	config.ShareTarget = conf.ShareTarget
+	config.DelayLogForUpstream = conf.DelayLogForUpstream
+	config.MinSubmitInterval = conf.MinSubmitInterval
+	config.MaxSubmitInterval = conf.MaxSubmitInterval
+	config.GetTxnsInterval = conf.GetTxnsInterval
+
+config = loadConfig(None, configmod, False)
 
 import logging
 import logging.handlers
@@ -48,13 +73,13 @@ if len(rootlogger.handlers) == 0:
 	)
 	for infoOnly in (
 		'checkShare',
-		'JSONRPCHandler',
-		'JSONRPCServer',
+		#'JSONRPCHandler',
+		#'JSONRPCServer',
 		'merkleMaker',
 		'StratumServer',
-		'Waker for JSONRPCServer',
+		#'Waker for JSONRPCServer',
 		'Waker for StratumServer',
-		'WorkLogPruner'
+		'poolWorker'
 	):
 		logging.getLogger(infoOnly).setLevel(logging.INFO)
 if getattr(config, 'LogToSysLog', False):
@@ -155,25 +180,46 @@ def blockChanged():
 from time import sleep, time
 import traceback
 
-def _WorkLogPruner_I(wl):
-	now = time()
-	pruned = 0
-	for username in wl:
-		userwork = wl[username]
-		for wli in tuple(userwork.keys()):
-			if now > userwork[wli][1] + 120:
-				del userwork[wli]
-				pruned += 1
-	WorkLogPruner.logger.debug('Pruned %d jobs' % (pruned,))
-
-def WorkLogPruner(wl):
+def poolWorker(wl, ss):
+	i = 0
 	while True:
 		try:
-			sleep(60)
-			_WorkLogPruner_I(wl)
+			sleep(5)
+
+			refreshConf = ""
+			loadConfig(config, configmod)
+			if ss.defaultTarget != config.ShareTarget:
+				refreshConf = "defaultTarget"
+				ss.defaultTarget = config.ShareTarget
+			if ss.MinSubmitInterval != config.MinSubmitInterval:
+				refreshConf += (", " if refreshConf else "") + "MinSubmitInterval"
+				ss.MinSubmitInterval = config.MinSubmitInterval
+			if ss.MaxSubmitInterval != config.MaxSubmitInterval:
+				refreshConf += (", " if refreshConf else "") + "MaxSubmitInterval"
+				ss.MaxSubmitInterval = config.MaxSubmitInterval
+			if ss.GetTxnsInterval != config.GetTxnsInterval:
+				refreshConf += (", " if refreshConf else "") + "GetTxnsInterval"
+				ss.GetTxnsInterval = config.GetTxnsInterval
+			if 	refreshConf:
+				poolWorker.logger.info('Refresh config item %s' % (refreshConf,))
+
+			i += 1
+			if i == 12:
+				i = 0
+
+				now = time()
+				pruned = 0
+				for username in wl:
+					userwork = wl[username]
+					for wli in tuple(userwork.keys()):
+						if now > userwork[wli][1] + 120:
+							del userwork[wli]
+							pruned += 1
+				if pruned:
+					poolWorker.logger.debug('Pruned %d jobs' % (pruned,))
 		except:
-			WorkLogPruner.logger.error(traceback.format_exc())
-WorkLogPruner.logger = logging.getLogger('WorkLogPruner')
+			poolWorker.logger.error(traceback.format_exc())
+poolWorker.logger = logging.getLogger('poolWorker')
 
 
 from merklemaker import merkleMaker
@@ -194,25 +240,6 @@ from time import time
 from util import PendingUpstream, RejectedShare, bdiff1target, dblsha, LEhash2int, swap32, target2bdiff, target2pdiff
 import jsonrpc
 import traceback
-
-gotwork = None
-if hasattr(config, 'GotWorkURI'):
-	gotwork = jsonrpc.ServiceProxy(config.GotWorkURI)
-
-if not hasattr(config, 'DelayLogForUpstream'):
-	config.DelayLogForUpstream = False
-
-if not hasattr(config, 'MinSubmitInterval'):
-	config.MinSubmitInterval = 3
-
-if not hasattr(config, 'MaxSubmitInterval'):
-	config.MaxSubmitInterval = 3
-
-if not hasattr(config, 'GetTxnsInterval'):
-	config.GetTxnsInterval = 10
-
-#if not hasattr(config, 'GotWorkTarget'):
-#	config.GotWorkTarget = 0
 
 def getStratumJob(jobid, wantClear = False):
 	MC = MM.getMC(wantClear)
@@ -701,9 +728,9 @@ if __name__ == "__main__":
 
 	restoreState(config.SaveStateFilename)
 
-	prune_thr = threading.Thread(target=WorkLogPruner, args=(workLog,))
-	prune_thr.daemon = True
-	prune_thr.start()
+	worker_thr = threading.Thread(target=poolWorker, args=(workLog, stratumsrv))
+	worker_thr.daemon = True
+	worker_thr.start()
 
 	bcnode_thr = threading.Thread(target=bcnode.serve_forever)
 	bcnode_thr.daemon = True
