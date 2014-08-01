@@ -262,7 +262,8 @@ class StratumHandler(networkserver.SocketHandler):
 		return True
 
 	def _stratum_mining_authorize(self, username, password = None):
-		self.changeTask(self.requestStratumUA, 0)
+		if not self.UA:
+			self.changeTask(self.requestStratumUA, 0)
 		return True
 		#try:
 		#	valid = self.server.checkAuthentication(username, password)
