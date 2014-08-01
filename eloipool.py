@@ -281,13 +281,12 @@ import traceback
 def getStratumJob(jobid, wantClear = False):
 	MC = MM.getMC(wantClear)
 	(dummy, merkleTree, coinbase, prevBlock, bits) = MC[:5]
-	now = time()
-	workLog.setdefault(None, {})[jobid] = (MC, now)
-	return (MC, workLog[None][jobid])
+	workLog.setdefault(None, {})[jobid] = (MC, time())
+	return workLog[None][jobid]
 
 def getExistingStratumJob(jobid):
 	wld = workLog[None][jobid]
-	return (wld[0], wld)
+	return wld
 
 loggersShare = []
 authenticators = []
@@ -379,15 +378,13 @@ def buildStratumData(share, merkleroot):
 	share['data'] = data
 	return data
 
-def IsJobValid(wli, wluser = None):
-	if wluser not in workLog:
+def IsJobValid(wli, now):
+	if None not in workLog:
 		return False
-	if wli not in workLog[wluser]:
+	if wli not in workLog[None]:
 		return False
-	(wld, issueT) = workLog[wluser][wli]
-	if time() < issueT - 120:
-		return False
-	return True
+	(wld, issueT) = workLog[None][wli]
+	return now >= issueT - 120
 
 def checkShare(share):
 	checkShare.logger.debug("Share: %s" % (share))

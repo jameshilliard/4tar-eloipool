@@ -69,7 +69,7 @@ class StratumHandler(networkserver.SocketHandler):
 		if not inbuf:
 			return
 
-		self.logger.debug("Get input from %s: %s" % (str(self.addr), inbuf))
+		self.logger.debug("%s< %s" % (str(self.addr), inbuf))
 
 		try:
 			rpc = json.loads(inbuf)
@@ -282,7 +282,7 @@ class StratumHandler(networkserver.SocketHandler):
 		self.lastGetTxnsJobId = jobid
 
 		try:
-			(MC, wld) = self.server.getExistingStratumJob(jobid)
+			(MC, now) = self.server.getExistingStratumJob(jobid)
 		except KeyError as e:
 			e.StratumQuiet = True
 			raise
@@ -322,9 +322,9 @@ class StratumServer(networkserver.AsyncSocketServer):
 	def checkAuthentication(self, username, password):
 		return True
 
-	def updateJobOnly(self, wantClear = False, forceClean = False):
+	def updateJobOnly(self, wantClear = False):
 		JobId = self.JobId + 1
-		(MC, wld) = self.getStratumJob(JobId, wantClear=wantClear)
+		(MC, now) = self.getStratumJob(JobId, wantClear=wantClear)
 		(height, merkleTree, cb, prevBlock, bits) = MC[:5]
 
 		if len(cb) > 96 - len(self.extranonce1null) - 4:
@@ -357,11 +357,11 @@ class StratumServer(networkserver.AsyncSocketServer):
 				steps,
 				'00000002',
 				b2a_hex(bits[::-1]).decode('ascii'),
-				b2a_hex(struct.pack('>L', int(time()))).decode('ascii'),
-				forceClean or not self.IsJobValid(self.JobId)
+				b2a_hex(struct.pack('>L', int(now))).decode('ascii'),
+				wantClear or not self.IsJobValid(self.JobId, now)
 			],
 		}).encode('ascii') + b"\n"
-		self.logger.debug("Update Job to: %s" % (self.JobBytes))
+		self.logger.debug("Update Job (wc=%d) to: %s" % (wantClear, self.JobBytes))
 		self.JobId = JobId
 		self.Height = height
 
