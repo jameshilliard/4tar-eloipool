@@ -288,7 +288,7 @@ def getExistingStratumJob(jobid):
 	wld = workLog[None][jobid]
 	return wld
 
-loggersShare = []
+shareLoggers = []
 authenticators = []
 
 RBDs = []
@@ -423,7 +423,8 @@ def checkShare(share):
 	DupeShareHACK[data] = None
 
 	blkhash = dblsha(data)
-	if blkhash[28:] != b'\0\0\0\0':
+	#if blkhash[28:] != b'\0\0\0\0':
+	if blkhash > config.ShareTarget:
 		raise RejectedShare('H-not-zero')
 	blkhashn = LEhash2int(blkhash)
 
@@ -461,13 +462,12 @@ def checkShare(share):
 
 	if not 'target' in share:
 		raise RejectedShare('stale-work')
-	workTarget = share['target']
-	if blkhashn > workTarget:
-		if blkhashn > config.ShareTarget or blkhashn > 2 * workTarget:
+
+	while share['target'] < blkhashn:
+		share['target'] *= 2
+		if share['target'] > config.ShareTarget:
 			raise RejectedShare('high-hash')
-		workTarget *= 2
-	share['target'] = workTarget
-	#share['_targethex'] = '%064x' % (workTarget,)
+	#share['_targethex'] = '%064x' % (share['target'],)
 
 	shareTimestamp = unpack('<L', data[68:72])[0]
 	if shareTime < issueT - 120:
@@ -509,9 +509,9 @@ def logShare(share):
 	#	share['solution'] = '%s*%s' % (b2a_hex(share['data'][4:36]).decode('ascii'), target2bdiff(share['target']))
 	#else:
 	#	share['solution'] = 0
-	share['height'] = share['height']
+	#share['height'] = share['height']
 	share['diff'] = target2bdiff(share['target'] if 'target' in share else config.ShareTarget)
-	for i in loggersShare:
+	for i in shareLoggers:
 		i.logShare(share)
 
 def checkAuthentication(username, password):
@@ -604,7 +604,7 @@ def stopServers():
 			os.close(fd)
 
 def stopLoggers():
-	for i in loggersShare:
+	for i in shareLoggers:
 		if hasattr(i, 'stop'):
 			i.stop()
 
@@ -715,7 +715,7 @@ if __name__ == "__main__":
 			fp, pathname, description = imp.find_module(name, sharelogging.__path__)
 			m = imp.load_module(name, fp, pathname, description)
 			lo = getattr(m, name)(**parameters)
-			loggersShare.append(lo)
+			shareLoggers.append(lo)
 		except:
 			logging.getLogger('sharelogging').error("Error setting up share logger %s: %s", name,  sys.exc_info())
 

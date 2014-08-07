@@ -244,7 +244,6 @@ class StratumHandler(networkserver.SocketHandler):
 			'nonce': bytes.fromhex(nonce),
 			'height': self.server.Height,
 			'time': submitTime,
-			#'userAgent': self.UA,
 		}
 		if jobid in self.JobTargets:
 			share['target'] = self.JobTargets[jobid]
