@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import agplcompliance
+#import agplcompliance
 from binascii import b2a_hex
 import collections
 from copy import deepcopy
@@ -57,7 +57,7 @@ class StratumHandler(networkserver.SocketHandler):
 		self.submitTimeCount = 0
 		self.JobTargets = collections.OrderedDict()
 		self.UA = None
-		self.LicenseSent = agplcompliance._SourceFiles is None
+		#self.LicenseSent = agplcompliance._SourceFiles is None
 
 	def sendReply(self, ob):
 		return self.push(json.dumps(ob).encode('ascii') + b"\n")
@@ -124,16 +124,16 @@ class StratumHandler(networkserver.SocketHandler):
 			'result': rv,
 		})
 
-	def sendLicenseNotice(self):
-		if self.fd == -1:
-			return
-		if not self.LicenseSent:
-			self.sendReply({
-				'id': 8,
-				'method': 'client.show_message',
-				'params': ('This stratum server is licensed under the GNU Affero General Public License, version 3. You may download source code over stratum using the server.get_source method.',),
-			})
-		self.LicenseSent = True
+#	def sendLicenseNotice(self):
+#		if self.fd == -1:
+#			return
+#		if not self.LicenseSent:
+#			self.sendReply({
+#				'id': 8,
+#				'method': 'client.show_message',
+#				'params': ('This stratum server is licensed under the GNU Affero General Public License, version 3. You may download source code over stratum using the server.get_source method.',),
+#			})
+#		self.LicenseSent = True
 
 	def sendJob(self):
 		if not len(self.JobTargets):
@@ -289,12 +289,12 @@ class StratumHandler(networkserver.SocketHandler):
 		(height, merkleTree, cb, prevBlock, bits) = MC[:5]
 		return list(b2a_hex(txn.data).decode('ascii') for txn in merkleTree.data[1:])
 
-	def _stratum_server_get_source(self, path = ''):
-		s = agplcompliance.get_source(path.encode('utf8'))
-		if s:
-			s = list(s)
-			s[1] = s[1].decode('latin-1')
-		return s
+#	def _stratum_server_get_source(self, path = ''):
+#		s = agplcompliance.get_source(path.encode('utf8'))
+#		if s:
+#			s = list(s)
+#			s[1] = s[1].decode('latin-1')
+#		return s
 
 
 class StratumServer(networkserver.AsyncSocketServer):
