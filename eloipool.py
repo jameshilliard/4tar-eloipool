@@ -419,7 +419,7 @@ def checkShare(share):
 	share['merkletree'] = workMerkleTree
 	cbtxn = deepcopy(workMerkleTree.data[0])
 	if username in config.PrivateMining:
-		cbtxn.outputs[0][1] = config.PrivateMining[username][0][1:]
+		cbtxn.outputs[0] = (cbtxn.outputs[0][0], config.PrivateMining[username][0][1:])
 	coinbase = workCoinbase + share['extranonce1'] + share['extranonce2']
 	cbtxn.setCoinbase(coinbase)
 	cbtxn.assemble()
