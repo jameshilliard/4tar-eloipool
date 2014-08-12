@@ -147,7 +147,7 @@ class StratumHandler(networkserver.SocketHandler):
 
 		#self.logger.debug("sendJob to %s@%s" % (self.UN, str(self.addr)))
 
-		if self.UN in self.server.PrivateMining:
+		if self.UN in self.server.PrivateMining and self.server.PrivateMining[self.UN][1]:
 			self.push(self.server.PrivateMining[self.UN][1])
 		else:
 			self.push(self.server.JobBytes)

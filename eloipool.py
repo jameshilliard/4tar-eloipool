@@ -49,12 +49,19 @@ def loadConfig(confMod, init = False):
 		if not hasattr(config, 'DelayLogForUpstream'):
 			config.DelayLogForUpstream = False
 
+		config.PrivateMining = {}
+		for username in config.TrackerAddr[1]:
+			pkScript = BitcoinScript.toAddress(config.TrackerAddr[1][username])
+			config.PrivateMining[username] = ( pack('<B', len(pkScript)) + pkScript, b'' )
+
 		rl[0] = rl[1] = rl[2] = rl[3] = 1
 	else:
 		r = 0
 
 		conf = open(confMod + ".py", 'r')
 		try:
+			taSection = 0
+			ta = []
 			for line in conf:
 				a = line.split('=')
 				if len(a) == 2:
@@ -75,13 +82,32 @@ def loadConfig(confMod, init = False):
 						r += 1
 						rl[3] = 1
 						config.GetTxnsInterval = int(a[1].strip())
+					elif a[0] == 'TrackerAddr':
+						taSection = 1
+					elif taSection == 1 and a[0] == '{':
+						taSection = 2
+					elif taSection == 2:
+						if a[0] == '}':
+							r += 1
+							for name in config.TrackerAddr[1]:
+								if name not in ta:
+									del config.TrackerAddr[1][name]
+							taSection = 0
+						else:
+							b = a[0].split(':')
+							name = b[0].strip("' \t")
+							addr = b[1].strip(",' \t")
+							ta.append(name)
+							if name not in config.TrackerAddr[1] or config.TrackerAddr[1][name] != addr:
+								pkScript = BitcoinScript.toAddress(addr)
+								config.PrivateMining[name] = ( pack('<B', len(pkScript)) + pkScript, b'' )
 
-					if r == 4:
+					if r == 5:
 						break
 		finally:
 			conf.close()
 
-		if r == 4:
+		if r == 5:
 			return
 
 	if not rl[0] or not hasattr(config, 'ShareTarget'):
@@ -92,11 +118,6 @@ def loadConfig(confMod, init = False):
 		config.MaxSubmitInterval = 100
 	if not rl[3] or not hasattr(config, 'GetTxnsInterval'):
 		config.GetTxnsInterval = 10
-
-	config.PrivateMining = {}
-	for username in config.TrackerAddr[1]:
-		pkScript = BitcoinScript.toAddress(config.TrackerAddr[1][username])
-		config.PrivateMining[username] = ( pack('<B', len(pkScript)) + pkScript, b'' )
 
 loadConfig(configmod, True)
 
@@ -418,7 +439,7 @@ def checkShare(share):
 	(workMerkleTree, workCoinbase) = wld[1:3]
 	share['merkletree'] = workMerkleTree
 	cbtxn = deepcopy(workMerkleTree.data[0])
-	if username in config.PrivateMining:
+	if username in config.PrivateMining and config.PrivateMining[username][1]:
 		cbtxn.outputs[0] = (cbtxn.outputs[0][0], config.PrivateMining[username][0][1:])
 	coinbase = workCoinbase + share['extranonce1'] + share['extranonce2']
 	cbtxn.setCoinbase(coinbase)
