@@ -27,6 +27,7 @@ if not args.config is None:
 	configmod = 'config_%s' % (args.config,)
 
 from bitcoin.script import BitcoinScript
+from struct import pack
 
 config = None
 def loadConfig(confMod, init = False):
@@ -154,7 +155,6 @@ except:
 from bitcoin.txn import Txn
 from base58 import b58decode
 from binascii import b2a_hex
-from struct import pack
 import subprocess
 from time import time, sleep
 
