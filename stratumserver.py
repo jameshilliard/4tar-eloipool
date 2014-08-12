@@ -49,7 +49,7 @@ class StratumHandler(networkserver.SocketHandler):
 		self.remoteHost = self.addr[0]
 		self.changeTask(None)
 		self.target = self.server.defaultTarget
-		self.server.schedule(self.sendLicenseNotice, time() + 4, errHandler=self)
+		#self.server.schedule(self.sendLicenseNotice, time() + 4, errHandler=self)
 		self.set_terminator(b"\n")
 		self.lastSubmitTime = 0
 		self.lastSubmitJobId = 0
