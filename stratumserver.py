@@ -137,13 +137,15 @@ class StratumHandler(networkserver.SocketHandler):
 
 	def sendJob(self):
 		if not len(self.JobTargets):
+			diff = target2bdiff(self.target)
+			self.logger.debug("Initialize difficulty to %s for %s@%s" % (diff, self.UN, str(self.addr)))
 			self.sendReply({
 				'id': None,
 				'method': 'mining.set_difficulty',
-				'params': [ target2bdiff(self.target) ],
+				'params': [ diff ],
 			})
 
-		self.logger.debug("sendJob to %s" % str(self.addr))
+		#self.logger.debug("sendJob to %s@%s" % (self.UN, str(self.addr)))
 
 		if self.UN in self.server.PrivateMining:
 			self.push(self.server.PrivateMining[self.UN][1])
@@ -212,7 +214,7 @@ class StratumHandler(networkserver.SocketHandler):
 						if self.target < self.server.networkTarget:
 							self.target = self.server.networkTarget
 						newBdiff = target2bdiff(self.target)
-						self.logger.info("Increase difficulty to %s for %s@%s" % (newBdiff, username, str(self.addr)))
+						self.logger.debug("Increase difficulty to %s for %s@%s" % (newBdiff, username, str(self.addr)))
 					self.submitTimeCount = 0
 				else:
 					self.submitTimeCount = 1
@@ -226,7 +228,7 @@ class StratumHandler(networkserver.SocketHandler):
 						if self.target > self.server.defaultTarget:
 							self.target = self.server.defaultTarget
 						newBdiff = target2bdiff(self.target)
-						self.logger.info("Decrease difficulty to %s for %s@%s" % (newBdiff, username, str(self.addr)))
+						self.logger.debug("Decrease difficulty to %s for %s@%s" % (newBdiff, username, str(self.addr)))
 					self.submitTimeCount = 0
 				else:
 					self.submitTimeCount = -1
