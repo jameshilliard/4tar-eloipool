@@ -65,9 +65,9 @@ class merkleMaker(threading.Thread):
 		super().__init__(*a, **k)
 		self.daemon = True
 		self.logger = logging.getLogger('merkleMaker')
-		self.CoinbasePrefix = b''
-		self.CoinbaseAux = {}
-		self.isOverflowed = False
+		#self.CoinbasePrefix = b''
+		#self.CoinbaseAux = {}
+		#self.isOverflowed = False
 		self.lastWarning = {}
 		self.MinimumTxnUpdateWait = 5
 		self.overflowed = 0
@@ -547,23 +547,34 @@ class merkleMaker(threading.Thread):
 			_makeCoinbase[1] = 0
 		else:
 			_makeCoinbase[1] += 1
-		rv = self.CoinbasePrefix
-		rv += pack('>L', now) + pack('>Q', _makeCoinbase[1]).lstrip(b'\0')
-		# NOTE: Not using varlenEncode, since this is always guaranteed to be < 100
-		rv = bytes( (len(rv),) ) + rv
-		for v in self.CoinbaseAux.values():
-			rv += v
-		if len(rv) > 95:
-			t = time()
-			if self.overflowed < t - 300:
-				self.logger.warning('Overflowing coinbase data! %d bytes long' % (len(rv),))
-				self.overflowed = t
-				self.isOverflowed = True
-			rv = rv[:95]
-		else:
-			self.isOverflowed = False
-		rv = bitcoin.script.encodeUNum(height) + rv
+		rv = pack('>L', now) + pack('>Q', _makeCoinbase[1]).lstrip(b'\0')
+		rv = bitcoin.script.encodeUNum(height) + bytes( (len(rv),) ) + rv
 		return rv
+
+#	def makeCoinbase(self, height):
+#		now = int(time())
+#		if now > _makeCoinbase[0]:
+#			_makeCoinbase[0] = now
+#			_makeCoinbase[1] = 0
+#		else:
+#			_makeCoinbase[1] += 1
+#		rv = self.CoinbasePrefix
+#		rv += pack('>L', now) + pack('>Q', _makeCoinbase[1]).lstrip(b'\0')
+#		# NOTE: Not using varlenEncode, since this is always guaranteed to be < 100
+#		rv = bytes( (len(rv),) ) + rv
+#		for v in self.CoinbaseAux.values():
+#			rv += v
+#		if len(rv) > 95:
+#			t = time()
+#			if self.overflowed < t - 300:
+#				self.logger.warning('Overflowing coinbase data! %d bytes long' % (len(rv),))
+#				self.overflowed = t
+#				self.isOverflowed = True
+#			rv = rv[:95]
+#		else:
+#			self.isOverflowed = False
+#		rv = bitcoin.script.encodeUNum(height) + rv
+#		return rv
 
 	def makeMerkleRoot(self, merkleTree, height):
 		cbtxn = merkleTree.data[0]
