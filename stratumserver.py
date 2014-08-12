@@ -56,7 +56,7 @@ class StratumHandler(networkserver.SocketHandler):
 		self.lastGetTxnsJobId = 0
 		self.submitTimeCount = 0
 		self.JobTargets = collections.OrderedDict()
-		self.UA = None
+		self.UN = self.UA = None
 		#self.LicenseSent = agplcompliance._SourceFiles is None
 
 	def sendReply(self, ob):
@@ -144,7 +144,12 @@ class StratumHandler(networkserver.SocketHandler):
 			})
 
 		self.logger.debug("sendJob to %s" % str(self.addr))
-		self.push(self.server.JobBytes)
+
+		if self.UN in self.server.PrivateMining:
+			self.push(self.server.PrivateMining[self.UN][1])
+		else:
+			self.push(self.server.JobBytes)
+
 		if len(self.JobTargets) > 4:
 			self.JobTargets.popitem(False)
 		self.JobTargets[self.server.JobId] = self.target
@@ -261,6 +266,7 @@ class StratumHandler(networkserver.SocketHandler):
 		return True
 
 	def _stratum_mining_authorize(self, username, password = None):
+		self.UN = username
 		if not self.UA:
 			self.changeTask(self.requestStratumUA, 0)
 		return True
@@ -318,6 +324,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.MinSubmitInterval = 0
 		self.MaxSubmitInterval = 0
 		self.GetTxnsInterval = 0
+		self.PrivateMining = {}
 
 	def checkAuthentication(self, username, password):
 		return True
@@ -361,7 +368,25 @@ class StratumServer(networkserver.AsyncSocketServer):
 				wantClear or not self.IsJobValid(self.JobId, now)
 			],
 		}).encode('ascii') + b"\n"
-		self.logger.debug("Update Job (wc=%d) to: %s" % (wantClear, self.JobBytes))
+
+		for username in self.PrivateMining:
+			self.PrivateMining[username][1] = json.dumps({
+				'id': None,
+				'method': 'mining.notify',
+				'params': [
+					"%d" % (JobId),
+					b2a_hex(swap32(prevBlock)).decode('ascii'),
+					b2a_hex(txn.data[:pos - len(self.extranonce1null) - 4]).decode('ascii'),
+					b2a_hex(txn.data[pos:pos + 13] + self.PrivateMining[username][0] + txn.data[-4:]).decode('ascii'),
+					steps,
+					'00000002',
+					b2a_hex(bits[::-1]).decode('ascii'),
+					b2a_hex(struct.pack('>L', int(now))).decode('ascii'),
+					wantClear or not self.IsJobValid(self.JobId, now)
+				],
+			}).encode('ascii') + b"\n"
+
+		self.logger.debug("Update Job (wc=%d) to: %d" % (wantClear, self.JobId))
 		self.JobId = JobId
 		self.Height = height
 

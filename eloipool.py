@@ -26,6 +26,8 @@ configmod = 'config'
 if not args.config is None:
 	configmod = 'config_%s' % (args.config,)
 
+from bitcoin.script import BitcoinScript
+
 config = None
 def loadConfig(confMod, init = False):
 	global config
@@ -90,6 +92,11 @@ def loadConfig(confMod, init = False):
 	if not rl[3] or not hasattr(config, 'GetTxnsInterval'):
 		config.GetTxnsInterval = 10
 
+	config.PrivateMining = {}
+	for username in config.TrackerAddr[1]:
+		pkScript = BitcoinScript.toAddress(config.TrackerAddr[1][username])
+		config.PrivateMining[username] = ( pack('<B', len(pkScript)) + pkScript, b'' )
+
 loadConfig(configmod, True)
 
 import logging
@@ -144,7 +151,6 @@ except:
 	pass
 
 
-from bitcoin.script import BitcoinScript
 from bitcoin.txn import Txn
 from base58 import b58decode
 from binascii import b2a_hex
@@ -177,10 +183,7 @@ def makeCoinbaseTxn(coinbaseValue, useCoinbaser = True, prevBlockHex = None, tra
 		else:
 			coinbaseValue -= coinbased
 
-	if trackerName and len(config.TrackerAddr) > 1 and trackerName in config.TrackerAddr[1]:
-		pkScript = BitcoinScript.toAddress(config.TrackerAddr[1][trackerName])
-	else:
-		pkScript = BitcoinScript.toAddress(config.TrackerAddr[0])
+	pkScript = BitcoinScript.toAddress(config.TrackerAddr[0])
 	txn.addOutput(coinbaseValue, pkScript)
 
 	# TODO
@@ -415,13 +418,15 @@ def checkShare(share):
 	(workMerkleTree, workCoinbase) = wld[1:3]
 	share['merkletree'] = workMerkleTree
 	cbtxn = deepcopy(workMerkleTree.data[0])
+	if username in config.PrivateMining:
+		cbtxn.outputs[0][1] = config.PrivateMining[username][0][1:]
 	coinbase = workCoinbase + share['extranonce1'] + share['extranonce2']
 	cbtxn.setCoinbase(coinbase)
 	cbtxn.assemble()
 	data = buildStratumData(share, workMerkleTree.withFirst(cbtxn))
-	shareMerkleRoot = data[36:68]
-	if shareMerkleRoot != workMerkleTree.withFirst(cbtxn):
-		raise RejectedShare('bad-txnmrklroot')
+	#shareMerkleRoot = data[36:68]
+	#if shareMerkleRoot != workMerkleTree.withFirst(cbtxn):
+	#	raise RejectedShare('bad-txnmrklroot')
 
 	if data in DupeShareHACK:
 		raise RejectedShare('duplicate')
@@ -463,6 +468,19 @@ def checkShare(share):
 			share['upstreamResult'] = True
 		MM.updateBlock(blkhash)
 
+	#cbpre = workCoinbase
+	cbpreLen = len(workCoinbase)
+	#if coinbase[:cbpreLen] != cbpre:
+	#	raise RejectedShare('bad-cb-prefix')
+
+	# Filter out known "I support" flags, to prevent exploits
+	for ff in (b'/P2SH/', b'NOP2SH', b'p2sh/CHV', b'p2sh/NOCHV'):
+		if coinbase.find(ff) > max(-1, cbpreLen - len(ff)):
+			raise RejectedShare('bad-cb-flag')
+
+	if len(coinbase) > 100:
+		raise RejectedShare('bad-cb-length')
+
 	if not 'target' in share:
 		raise RejectedShare('stale-work')
 
@@ -479,19 +497,6 @@ def checkShare(share):
 		raise RejectedShare('time-too-old')
 	if shareTimestamp > shareTime + 7200:
 		raise RejectedShare('time-too-new')
-
-	#cbpre = workCoinbase
-	#cbpreLen = len(cbpre)
-	#if coinbase[:cbpreLen] != cbpre:
-	#	raise RejectedShare('bad-cb-prefix')
-
-	# Filter out known "I support" flags, to prevent exploits
-	for ff in (b'/P2SH/', b'NOP2SH', b'p2sh/CHV', b'p2sh/NOCHV'):
-		if coinbase.find(ff) > max(-1, cbpreLen - len(ff)):
-			raise RejectedShare('bad-cb-flag')
-
-	if len(coinbase) > 100:
-		raise RejectedShare('bad-cb-length')
 
 	#if len(othertxndata):
 	#	allowed = assembleBlock(data, txlist)[80:]
@@ -747,6 +752,7 @@ if __name__ == "__main__":
 	stratumsrv.MinSubmitInterval = config.MinSubmitInterval
 	stratumsrv.MaxSubmitInterval = config.MaxSubmitInterval
 	stratumsrv.GetTxnsInterval = config.GetTxnsInterval
+	stratumsrv.PrivateMining = config.PrivateMining
 	stratumsrv.getStratumJob = getStratumJob
 	stratumsrv.getExistingStratumJob = getExistingStratumJob
 	stratumsrv.receiveShare = receiveShare
