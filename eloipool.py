@@ -93,14 +93,15 @@ def loadConfig(confMod, init = False):
 								if name not in ta:
 									del config.TrackerAddr[1][name]
 							taSection = 0
-						else:
+						elif a[0][0] != '#':
 							b = a[0].split(':')
 							name = b[0].strip("' \t")
 							addr = b[1].strip(",' \t")
-							ta.append(name)
-							if name not in config.TrackerAddr[1] or config.TrackerAddr[1][name] != addr:
-								pkScript = BitcoinScript.toAddress(addr)
-								config.PrivateMining[name] = ( pack('<B', len(pkScript)) + pkScript, b'' )
+							if name and len(addr) > 30:
+								ta.append(name)
+								if name not in config.TrackerAddr[1] or config.TrackerAddr[1][name] != addr:
+									pkScript = BitcoinScript.toAddress(addr)
+									config.PrivateMining[name] = ( pack('<B', len(pkScript)) + pkScript, b'' )
 
 					if r == 5:
 						break
