@@ -167,6 +167,9 @@ class StratumHandler(networkserver.SocketHandler):
 	def _stratum_mining_subscribe(self, UA = None, xid = None):
 		if not UA is None:
 			self.UA = UA
+		if not self.UA:
+			self.changeTask(self.requestStratumUA, 0)
+
 		if not hasattr(self, '_sid'):
 			self._sid = UniqueSessionIdManager.get()
 		if self.server._Clients.get(self._sid) not in (self, None):
@@ -177,7 +180,6 @@ class StratumHandler(networkserver.SocketHandler):
 		self.extranonce1 = xid
 		xid = b2a_hex(xid).decode('ascii')
 		self.server._Clients[id(self)] = self
-		self.changeTask(self.sendJob, 0)
 		return [
 			[
 				['mining.notify', '%s1' % (xid,)],
@@ -267,8 +269,7 @@ class StratumHandler(networkserver.SocketHandler):
 
 	def _stratum_mining_authorize(self, username, password = None):
 		self.UN = username
-		if not self.UA:
-			self.changeTask(self.requestStratumUA, 0)
+		self.changeTask(self.sendJob, 0)
 		return True
 		#try:
 		#	valid = self.server.checkAuthentication(username, password)
