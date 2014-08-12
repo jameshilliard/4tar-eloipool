@@ -60,11 +60,11 @@ def loadConfig(confMod, init = False):
 
 		conf = open(confMod + ".py", 'r')
 		try:
-			taSection = 0
+			taStep = 0
 			ta = []
 			for line in conf:
 				a = line.split('=')
-				if len(a) == 2:
+				if len(a) == 2 or taStep:
 					a[0] = a[0].strip()
 					if a[0] == "ShareTarget":
 						r += 1
@@ -83,21 +83,26 @@ def loadConfig(confMod, init = False):
 						rl[3] = 1
 						config.GetTxnsInterval = int(a[1].strip())
 					elif a[0] == 'TrackerAddr':
-						taSection = 1
-					elif taSection == 1 and a[0] == '{':
-						taSection = 2
-					elif taSection == 2:
+						taStep = 1
+					elif taStep == 1 and a[0] == '{':
+						taStep = 2
+					elif taStep == 2:
 						if a[0] == '}':
 							r += 1
+							cta = []
 							for name in config.TrackerAddr[1]:
 								if name not in ta:
-									del config.TrackerAddr[1][name]
-							taSection = 0
+									cta.append(name)
+							for name in cta:
+								logging.getLogger("loadConfig").debug('Clear VPM addr: %s' % (name,))
+								del config.TrackerAddr[1][name], config.PrivateMining[name]
+							taStep = 0
 						elif a[0][0] != '#':
 							b = a[0].split(':')
 							name = b[0].strip("' \t")
 							addr = b[1].strip(",' \t")
 							if name and len(addr) > 30:
+								logging.getLogger("loadConfig").debug('VPM addr: %s - %s' % (name, addr))
 								ta.append(name)
 								if name not in config.TrackerAddr[1] or config.TrackerAddr[1][name] != addr:
 									pkScript = BitcoinScript.toAddress(addr)
