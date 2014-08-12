@@ -731,6 +731,8 @@ def _test():
 		def warning(self, *a):
 			if self.LO: return
 			reallogger.warning(*a)
+		def info(self, *a):
+			pass
 		def debug(self, *a):
 			pass
 	MM.logger = fakelogger()
