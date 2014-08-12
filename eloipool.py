@@ -52,7 +52,7 @@ def loadConfig(confMod, init = False):
 		config.PrivateMining = {}
 		for username in config.TrackerAddr[1]:
 			pkScript = BitcoinScript.toAddress(config.TrackerAddr[1][username])
-			config.PrivateMining[username] = ( pack('<B', len(pkScript)) + pkScript, b'' )
+			config.PrivateMining[username] = ( pack('<B', len(pkScript)) + pkScript, b'', 0 )
 
 		rl[0] = rl[1] = rl[2] = rl[3] = 1
 	else:
@@ -94,7 +94,7 @@ def loadConfig(confMod, init = False):
 								if name not in ta:
 									cta.append(name)
 							for name in cta:
-								logging.getLogger("loadConfig").debug('Clear VPM addr: %s' % (name,))
+								#logging.getLogger("loadConfig").debug('Clear VPM addr: %s' % (name,))
 								del config.TrackerAddr[1][name], config.PrivateMining[name]
 							taStep = 0
 						elif a[0][0] != '#':
@@ -102,11 +102,12 @@ def loadConfig(confMod, init = False):
 							name = b[0].strip("' \t")
 							addr = b[1].strip(",' \t")
 							if name and len(addr) > 30:
-								logging.getLogger("loadConfig").debug('VPM addr: %s - %s' % (name, addr))
+								#logging.getLogger("loadConfig").debug('VPM addr: %s - %s' % (name, addr))
 								ta.append(name)
 								if name not in config.TrackerAddr[1] or config.TrackerAddr[1][name] != addr:
+									config.TrackerAddr[1][name] = addr
 									pkScript = BitcoinScript.toAddress(addr)
-									config.PrivateMining[name] = ( pack('<B', len(pkScript)) + pkScript, b'' )
+									config.PrivateMining[name] = ( pack('<B', len(pkScript)) + pkScript, b'', 1 )
 
 					if r == 5:
 						break

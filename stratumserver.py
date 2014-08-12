@@ -57,6 +57,7 @@ class StratumHandler(networkserver.SocketHandler):
 		self.submitTimeCount = 0
 		self.JobTargets = collections.OrderedDict()
 		self.UN = self.UA = None
+		self.VPM = 0
 		#self.LicenseSent = agplcompliance._SourceFiles is None
 
 	def sendReply(self, ob):
@@ -148,9 +149,14 @@ class StratumHandler(networkserver.SocketHandler):
 		#self.logger.debug("sendJob to %s@%s" % (self.UN, str(self.addr)))
 
 		if self.UN in self.server.PrivateMining and self.server.PrivateMining[self.UN][1]:
+			self.VPM = 1
 			self.push(self.server.PrivateMining[self.UN][1])
 		else:
-			self.push(self.server.JobBytes)
+			if self.VPM:
+				self.push(self.server.JobBytesRestart)
+			else:
+				self.push(self.server.JobBytes)
+			self.VPM = 0
 
 		if len(self.JobTargets) > 4:
 			self.JobTargets.popitem(False)
@@ -356,6 +362,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 
 		steps = list(b2a_hex(h).decode('ascii') for h in merkleTree._steps)
 
+		Restart = wantClear or not self.IsJobValid(self.JobId, now)
 		self.JobBytes = json.dumps({
 			'id': None,
 			'method': 'mining.notify',
@@ -368,12 +375,31 @@ class StratumServer(networkserver.AsyncSocketServer):
 				'00000002',
 				b2a_hex(bits[::-1]).decode('ascii'),
 				b2a_hex(struct.pack('>L', int(now))).decode('ascii'),
-				wantClear or not self.IsJobValid(self.JobId, now)
+				Restart
 			],
 		}).encode('ascii') + b"\n"
 
+		if Restart:
+			self.JobBytesRestart = self.JobBytes
+		else:
+			json.dumps({
+				'id': None,
+				'method': 'mining.notify',
+				'params': [
+					"%d" % (JobId),
+					b2a_hex(swap32(prevBlock)).decode('ascii'),
+					b2a_hex(txn.data[:pos - len(self.extranonce1null) - 4]).decode('ascii'),
+					b2a_hex(txn.data[pos:]).decode('ascii'),
+					steps,
+					'00000002',
+					b2a_hex(bits[::-1]).decode('ascii'),
+					b2a_hex(struct.pack('>L', int(now))).decode('ascii'),
+					True
+				],
+			}).encode('ascii') + b"\n"
+
 		for username in self.PrivateMining:
-			(pkScript, JobBytes) = self.PrivateMining[username]
+			(pkScript, JobBytes, refreshed) = self.PrivateMining[username]
 			JobBytes = json.dumps({
 				'id': None,
 				'method': 'mining.notify',
@@ -386,10 +412,10 @@ class StratumServer(networkserver.AsyncSocketServer):
 					'00000002',
 					b2a_hex(bits[::-1]).decode('ascii'),
 					b2a_hex(struct.pack('>L', int(now))).decode('ascii'),
-					wantClear or not self.IsJobValid(self.JobId, now)
+					Restart or refreshed
 				],
 			}).encode('ascii') + b"\n"
-			self.PrivateMining[username] = (pkScript, JobBytes)
+			self.PrivateMining[username] = (pkScript, JobBytes, 0)
 
 		self.logger.debug("Update Job (wc=%d) to: %d" % (wantClear, self.JobId))
 		self.JobId = JobId
