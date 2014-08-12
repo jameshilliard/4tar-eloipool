@@ -53,7 +53,12 @@ IdleSleepTime = 0.1
 ### Settings relating to reward generation
 
 # Address to generate rewards to
-TrackerAddr = 'mrsP7M31efGkQHXb7nRiWLDjfV2M8oakf2'  # testnet
+TrackerAddr = (
+	'1FJnCqzui9vKDmY7iz948qccmDdaGaCgD6',
+	{
+		'name':	'mrsP7M31efGkQHXb7nRiWLDjfV2M8oakf2',	# for private mining of 'name', the addr here is a testnet one
+	}
+)
 
 # Coinbaser command to control reward delegation
 # %d is replaced with the total value of the block reward (in satoshis)

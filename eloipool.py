@@ -152,7 +152,7 @@ from struct import pack
 import subprocess
 from time import time, sleep
 
-def makeCoinbaseTxn(coinbaseValue, useCoinbaser = True, prevBlockHex = None):
+def makeCoinbaseTxn(coinbaseValue, useCoinbaser = True, prevBlockHex = None, trackerName = None):
 	txn = Txn.new()
 
 	if useCoinbaser and hasattr(config, 'CoinbaserCmd') and config.CoinbaserCmd:
@@ -177,7 +177,10 @@ def makeCoinbaseTxn(coinbaseValue, useCoinbaser = True, prevBlockHex = None):
 		else:
 			coinbaseValue -= coinbased
 
-	pkScript = BitcoinScript.toAddress(config.TrackerAddr)
+	if trackerName and len(config.TrackerAddr) > 1 and trackerName in config.TrackerAddr[1]:
+		pkScript = BitcoinScript.toAddress(config.TrackerAddr[1][trackerName])
+	else:
+		pkScript = BitcoinScript.toAddress(config.TrackerAddr[0])
 	txn.addOutput(coinbaseValue, pkScript)
 
 	# TODO
@@ -400,7 +403,7 @@ def checkShare(share):
 	isstratum = True
 	wli = share['jobid']
 	#buildStratumData(share, b'\0' * 32)
-	othertxndata = b''
+	#othertxndata = b''
 	MWL = workLog[None]
 	if wli not in MWL:
 		raise RejectedShare('unknown-work')
@@ -417,6 +420,8 @@ def checkShare(share):
 	cbtxn.assemble()
 	data = buildStratumData(share, workMerkleTree.withFirst(cbtxn))
 	shareMerkleRoot = data[36:68]
+	if shareMerkleRoot != workMerkleTree.withFirst(cbtxn):
+		raise RejectedShare('bad-txnmrklroot')
 
 	if data in DupeShareHACK:
 		raise RejectedShare('duplicate')
@@ -424,9 +429,10 @@ def checkShare(share):
 
 	blkhash = dblsha(data)
 	#if blkhash[28:] != b'\0\0\0\0':
-	if blkhash > config.ShareTarget:
-		raise RejectedShare('H-not-zero')
+	#	raise RejectedShare('H-not-zero')
 	blkhashn = LEhash2int(blkhash)
+	if blkhashn > config.ShareTarget:
+		raise RejectedShare('H-not-zero')
 
 	global networkTarget
 	logfunc = getattr(checkShare.logger, 'info' if blkhashn <= networkTarget else 'debug')
@@ -437,18 +443,15 @@ def checkShare(share):
 	# NOTE: this isn't actually needed for MC mode, but we're abusing it for a trivial share check...
 	txlist = workMerkleTree.data
 	txlist = [deepcopy(txlist[0]),] + txlist[1:]
-	cbtxn = txlist[0]
-	cbtxn.setCoinbase(coinbase or workCoinbase)
-	cbtxn.assemble()
 
 	if blkhashn <= networkTarget:
 		logfunc("Submitting upstream")
 		RBDs.append( deepcopy( (data, txlist, share.get('blkdata', None), workMerkleTree, share, wld) ) )
 		payload = share['data']
-		if len(othertxndata):
-			payload += share['blkdata']
-		else:
-			payload += assembleBlock(data, txlist)[80:]
+		#if len(othertxndata):
+		#	payload += share['blkdata']
+		#else:
+		payload += assembleBlock(data, txlist)[80:]
 		logfunc('Real block payload: %s' % (b2a_hex(payload).decode('utf8'),))
 		RBPs.append(payload)
 		threading.Thread(target=blockSubmissionThread, args=(payload, blkhash, share)).start()
@@ -477,10 +480,10 @@ def checkShare(share):
 	if shareTimestamp > shareTime + 7200:
 		raise RejectedShare('time-too-new')
 
-	cbpre = workCoinbase
-	cbpreLen = len(cbpre)
-	if coinbase[:cbpreLen] != cbpre:
-		raise RejectedShare('bad-cb-prefix')
+	#cbpre = workCoinbase
+	#cbpreLen = len(cbpre)
+	#if coinbase[:cbpreLen] != cbpre:
+	#	raise RejectedShare('bad-cb-prefix')
 
 	# Filter out known "I support" flags, to prevent exploits
 	for ff in (b'/P2SH/', b'NOP2SH', b'p2sh/CHV', b'p2sh/NOCHV'):
@@ -490,13 +493,10 @@ def checkShare(share):
 	if len(coinbase) > 100:
 		raise RejectedShare('bad-cb-length')
 
-	if shareMerkleRoot != workMerkleTree.withFirst(cbtxn):
-		raise RejectedShare('bad-txnmrklroot')
-
-	if len(othertxndata):
-		allowed = assembleBlock(data, txlist)[80:]
-		if allowed != share['blkdata']:
-			raise RejectedShare('bad-txns')
+	#if len(othertxndata):
+	#	allowed = assembleBlock(data, txlist)[80:]
+	#	if allowed != share['blkdata']:
+	#		raise RejectedShare('bad-txns')
 
 checkShare.logger = logging.getLogger('checkShare')
 

@@ -191,8 +191,7 @@ class merkleMaker(threading.Thread):
 				self.merkleRoots.clear()
 				self.ready = False
 				return
-			else:
-				bits = self.currentBlock[2]
+			bits = self.currentBlock[2]
 
 		if _HBH is None:
 			_HBH = (b2a_hex(newBlock[::-1]).decode('utf8'), b2a_hex(bits[::-1]).decode('utf8'))
@@ -359,8 +358,7 @@ class merkleMaker(threading.Thread):
 		cbtxn.setCoinbase(b'\0\0')
 		cbtxn.assemble()
 		txnlist.insert(0, cbtxn.data)
-		txninfo.insert(0, {
-		})
+		txninfo.insert(0, {})
 
 		txnlist = [a for a in map(Txn, txnlist[1:])]
 		txnlist.insert(0, cbtxn)
@@ -455,7 +453,7 @@ class merkleMaker(threading.Thread):
 
 	def _updateMerkleTree_fromTS(self, TS):
 		MP = self._CallGBT(TS)
-		self.logger.debug("To call _ProcessGBT")
+		#self.logger.debug("To call _ProcessGBT")
 		newMerkleTree = self._ProcessGBT(MP, TS)
 
 		# Some versions of bitcoinrpc ServiceProxy have problems copying/pickling, so just store name and URI for now
@@ -661,7 +659,7 @@ class merkleMaker(threading.Thread):
 
 		# Nothing left to do, fire onBlockUpdate event (if appropriate) and sleep
 		if self.needMerkle == 1:
-			self.logger.debug("99999999999999999999999999999999999999999999")
+			#self.logger.debug("99999999999999999999999999999999999999999999")
 			self.onBlockUpdate()
 			self.needMerkle = False
 		self._doing('idle')
