@@ -412,7 +412,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 					'00000002',
 					b2a_hex(bits[::-1]).decode('ascii'),
 					b2a_hex(struct.pack('>L', int(now))).decode('ascii'),
-					Restart or refreshed
+					Restart or refreshed > 0
 				],
 			}).encode('ascii') + b"\n"
 			self.PrivateMining[username] = (pkScript, JobBytes, 0)
