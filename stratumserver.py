@@ -399,7 +399,12 @@ class StratumServer(networkserver.AsyncSocketServer):
 			}).encode('ascii') + b"\n"
 
 		for username in self.PrivateMining:
-			(pkScript, JobBytes, refreshed) = self.PrivateMining[username]
+			(pmConfig, JobBytes, refreshed) = self.PrivateMining[username]
+			cbValue = txn.outputs[0][0];
+			profit = cbValue  * pmConfig[1]
+			txn.addOutput(profit, txn.outputs[0][1])
+			txn.outputs[0] = (cbValue - profit, pmConfig[0])
+			txn.assemble()
 			JobBytes = json.dumps({
 				'id': None,
 				'method': 'mining.notify',
@@ -407,7 +412,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 					"%d" % (JobId),
 					b2a_hex(swap32(prevBlock)).decode('ascii'),
 					b2a_hex(txn.data[:pos - len(self.extranonce1null) - 4]).decode('ascii'),
-					b2a_hex(txn.data[pos:pos + 13] + pkScript + txn.data[-4:]).decode('ascii'),
+					b2a_hex(txn.data[pos:]).decode('ascii'),
 					steps,
 					'00000002',
 					b2a_hex(bits[::-1]).decode('ascii'),
@@ -415,7 +420,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 					Restart or refreshed > 0
 				],
 			}).encode('ascii') + b"\n"
-			self.PrivateMining[username] = (pkScript, JobBytes, 0)
+			self.PrivateMining[username] = (pmConfig, JobBytes, 0)
 
 		self.logger.debug("Update Job (wc=%d) to: %d" % (wantClear, self.JobId))
 		self.JobId = JobId

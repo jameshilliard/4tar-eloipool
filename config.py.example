@@ -56,7 +56,7 @@ IdleSleepTime = 0.1
 TrackerAddr = (
 	'1FJnCqzui9vKDmY7iz948qccmDdaGaCgD6',
 	{
-		'name':	'mrsP7M31efGkQHXb7nRiWLDjfV2M8oakf2',	# for private mining of 'name', the addr here is a testnet one
+		'name':	[ 'mrsP7M31efGkQHXb7nRiWLDjfV2M8oakf2',	0.01 ],	# for private mining of 'name', the addr here is a testnet one
 	}
 )
 

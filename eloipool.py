@@ -27,7 +27,6 @@ if not args.config is None:
 	configmod = 'config_%s' % (args.config,)
 
 from bitcoin.script import BitcoinScript
-from struct import pack
 
 config = None
 def loadConfig(confMod, init = False):
@@ -49,10 +48,12 @@ def loadConfig(confMod, init = False):
 		if not hasattr(config, 'DelayLogForUpstream'):
 			config.DelayLogForUpstream = False
 
+		config.TrackerAddr[0] = BitcoinScript.toAddress(config.TrackerAddr[0])
+
 		config.PrivateMining = {}
 		for username in config.TrackerAddr[1]:
-			pkScript = BitcoinScript.toAddress(config.TrackerAddr[1][username])
-			config.PrivateMining[username] = ( pack('<B', len(pkScript)) + pkScript, b'', 0 )
+			addr = BitcoinScript.toAddress(config.TrackerAddr[1][username][0])
+			config.PrivateMining[username] = ( [ addr, config.TrackerAddr[1][username][1] ], b'', 0 )
 
 		rl[0] = rl[1] = rl[2] = rl[3] = 1
 	else:
@@ -61,7 +62,7 @@ def loadConfig(confMod, init = False):
 		conf = open(confMod + ".py", 'r')
 		try:
 			taStep = 0
-			ta = []
+			tas = []
 			for line in conf:
 				a = line.split('=')
 				if len(a) == 2 or taStep:
@@ -87,27 +88,30 @@ def loadConfig(confMod, init = False):
 					elif taStep == 1 and a[0] == '{':
 						taStep = 2
 					elif taStep == 2:
+						ctas = config.TrackerAddr[1]
+						cpms = config.PrivateMining
 						if a[0] == '}':
 							r += 1
-							cta = []
-							for name in config.TrackerAddr[1]:
+							ctas_del = []
+							for name in ctas:
 								if name not in ta:
-									cta.append(name)
-							for name in cta:
+									ctas_del.append(name)
+							for name in ctas_del:
 								#logging.getLogger("loadConfig").debug('Clear VPM addr: %s' % (name,))
-								del config.TrackerAddr[1][name], config.PrivateMining[name]
+								del ctas[name], cpms[name]
 							taStep = 0
 						elif a[0][0] != '#':
 							b = a[0].split(':')
 							name = b[0].strip("' \t")
-							addr = b[1].strip(",' \t")
+							conf = b[1].strip(",' \t[]").split(',')
+							addr = conf[0].strip("' \t")
+							perc = float(conf[1].strip("' \t"))
 							if name and len(addr) > 30:
 								#logging.getLogger("loadConfig").debug('VPM addr: %s - %s' % (name, addr))
-								ta.append(name)
-								if name not in config.TrackerAddr[1] or config.TrackerAddr[1][name] != addr:
-									config.TrackerAddr[1][name] = addr
-									pkScript = BitcoinScript.toAddress(addr)
-									config.PrivateMining[name] = ( pack('<B', len(pkScript)) + pkScript, b'', 1 )
+								tas.append(name)
+								if name not in ctas or ctas[name][0] != addr or ctas[name][1] != perc:
+									ctas[name] = [ addr, perc ]
+									cpms[name] = ( [ BitcoinScript.toAddress(addr), perc ], b'', 1 )
 
 					if r == 5:
 						break
@@ -186,33 +190,33 @@ from binascii import b2a_hex
 import subprocess
 from time import time, sleep
 
-def makeCoinbaseTxn(coinbaseValue, useCoinbaser = True, prevBlockHex = None, trackerName = None):
+def makeCoinbaseTxn(coinbaseValue, prevBlockHex = None):
 	txn = Txn.new()
 
-	if useCoinbaser and hasattr(config, 'CoinbaserCmd') and config.CoinbaserCmd:
-		coinbased = 0
-		try:
-			cmd = config.CoinbaserCmd
-			cmd = cmd.replace('%d', str(coinbaseValue))
-			cmd = cmd.replace('%p', prevBlockHex or '""')
-			p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-			nout = int(p.stdout.readline())
-			for i in range(nout):
-				amount = int(p.stdout.readline())
-				addr = p.stdout.readline().rstrip(b'\n').decode('utf8')
-				pkScript = BitcoinScript.toAddress(addr)
-				txn.addOutput(amount, pkScript)
-				coinbased += amount
-		except:
-			coinbased = coinbaseValue + 1
-		if coinbased >= coinbaseValue:
-			logging.getLogger('makeCoinbaseTxn').error('Coinbaser failed!')
-			txn.outputs = []
-		else:
-			coinbaseValue -= coinbased
+#	if useCoinbaser and hasattr(config, 'CoinbaserCmd') and config.CoinbaserCmd:
+#		coinbased = 0
+#		try:
+#			cmd = config.CoinbaserCmd
+#			cmd = cmd.replace('%d', str(coinbaseValue))
+#			cmd = cmd.replace('%p', prevBlockHex or '""')
+#			p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+#			nout = int(p.stdout.readline())
+#			for i in range(nout):
+#				amount = int(p.stdout.readline())
+#				addr = p.stdout.readline().rstrip(b'\n').decode('utf8')
+#				pkScript = BitcoinScript.toAddress(addr)
+#				txn.addOutput(amount, pkScript)
+#				coinbased += amount
+#		except:
+#			coinbased = coinbaseValue + 1
+#		if coinbased >= coinbaseValue:
+#			logging.getLogger('makeCoinbaseTxn').error('Coinbaser failed!')
+#			txn.outputs = []
+#		else:
+#			coinbaseValue -= coinbased
 
-	pkScript = BitcoinScript.toAddress(config.TrackerAddr[0])
-	txn.addOutput(coinbaseValue, pkScript)
+#	pkScript = BitcoinScript.toAddress(config.TrackerAddr[0])
+	txn.addOutput(coinbaseValue, config.TrackerAddr[0])
 
 	# TODO
 	# TODO: red flag on dupe coinbase
@@ -305,7 +309,6 @@ from binascii import b2a_hex
 from copy import deepcopy
 from math import ceil, log
 from merklemaker import MakeBlockHeader
-from struct import pack, unpack
 import threading
 from time import time
 from util import PendingUpstream, RejectedShare, bdiff1target, dblsha, LEhash2int, swap32, target2bdiff, target2pdiff
@@ -420,6 +423,8 @@ def IsJobValid(wli, now):
 	(wld, issueT) = workLog[None][wli]
 	return now >= issueT - 120
 
+from struct import unpack
+
 def checkShare(share):
 	checkShare.logger.debug("Share: %s" % (share))
 
@@ -447,7 +452,11 @@ def checkShare(share):
 	share['merkletree'] = workMerkleTree
 	cbtxn = deepcopy(workMerkleTree.data[0])
 	if username in config.PrivateMining and config.PrivateMining[username][1]:
-		cbtxn.outputs[0] = (cbtxn.outputs[0][0], config.PrivateMining[username][0][1:])
+		pmConfig = config.PrivateMining[username][0]
+		cbValue = cbtxn.outputs[0][0]
+		profit = cbValue  * pmConfig[1]
+		cbtxn.addOutput(profit, cbtxn.outputs[0][1])
+		cbtxn.outputs[0] = (cbValue - profit, pmConfig[0])
 	coinbase = workCoinbase + share['extranonce1'] + share['extranonce2']
 	cbtxn.setCoinbase(coinbase)
 	cbtxn.assemble()
