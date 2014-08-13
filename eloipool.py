@@ -94,7 +94,7 @@ def loadConfig(confMod, init = False):
 							r += 1
 							ctas_del = []
 							for name in ctas:
-								if name not in ta:
+								if name not in tas:
 									ctas_del.append(name)
 							for name in ctas_del:
 								#logging.getLogger("loadConfig").debug('Clear VPM addr: %s' % (name,))
@@ -103,9 +103,9 @@ def loadConfig(confMod, init = False):
 						elif a[0][0] != '#':
 							b = a[0].split(':')
 							name = b[0].strip("' \t")
-							conf = b[1].strip(",' \t[]").split(',')
-							addr = conf[0].strip("' \t")
-							perc = float(conf[1].strip("' \t"))
+							pmCfg = b[1].strip(",' \t[]").split(',')
+							addr = pmCfg[0].strip("' \t")
+							perc = float(pmCfg[1].strip("' \t"))
 							if name and len(addr) > 30:
 								#logging.getLogger("loadConfig").debug('VPM addr: %s - %s' % (name, addr))
 								tas.append(name)
