@@ -87,7 +87,7 @@ def loadConfig(confMod, init = False):
 						taStep = 1
 					elif taStep == 1 and a[0] == '{':
 						taStep = 2
-					elif taStep == 2:
+					elif taStep >= 2:
 						ctas = config.TrackerAddr[1]
 						cpms = config.PrivateMining
 						if a[0] == '}':
@@ -97,8 +97,11 @@ def loadConfig(confMod, init = False):
 								if name not in tas:
 									ctas_del.append(name)
 							for name in ctas_del:
+								taStep = 3
 								#logging.getLogger("loadConfig").debug('Clear VPM addr: %s' % (name,))
 								del ctas[name], cpms[name]
+							if taStep > 2:
+								stratumsrv.updateJob()
 							taStep = 0
 						elif a[0][0] != '#':
 							b = a[0].split(':')
@@ -110,6 +113,7 @@ def loadConfig(confMod, init = False):
 								#logging.getLogger("loadConfig").debug('VPM addr: %s - %s' % (name, addr))
 								tas.append(name)
 								if name not in ctas or ctas[name][0] != addr or ctas[name][1] != perc:
+									taStep = 3
 									ctas[name] = [ addr, perc ]
 									cpms[name] = ( [ BitcoinScript.toAddress(addr), perc ], b'', 1 )
 
