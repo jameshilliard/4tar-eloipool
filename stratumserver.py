@@ -58,7 +58,7 @@ class StratumHandler(networkserver.SocketHandler):
 		self.submitTimeCount = 0
 		self.JobTargets = collections.OrderedDict()
 		self.UN = self.UA = None
-		self.VPM = 0
+		self.VPM = False
 		#self.LicenseSent = agplcompliance._SourceFiles is None
 
 	def sendReply(self, ob):
@@ -150,14 +150,14 @@ class StratumHandler(networkserver.SocketHandler):
 		#self.logger.debug("sendJob to %s@%s" % (self.UN, str(self.addr)))
 
 		if self.UN in self.server.PrivateMining and self.server.PrivateMining[self.UN][1]:
-			self.VPM = 1
+			self.VPM = True
 			self.push(self.server.PrivateMining[self.UN][1])
 		else:
 			if self.VPM:
+				self.VPM = False
 				self.push(self.server.JobBytesRestart)
 			else:
 				self.push(self.server.JobBytes)
-			self.VPM = 0
 
 		if len(self.JobTargets) > 4:
 			self.JobTargets.popitem(False)
@@ -383,7 +383,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		if Restart:
 			self.JobBytesRestart = self.JobBytes
 		else:
-			json.dumps({
+			self.JobBytesRestart = json.dumps({
 				'id': None,
 				'method': 'mining.notify',
 				'params': [
