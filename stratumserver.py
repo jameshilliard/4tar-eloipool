@@ -402,9 +402,12 @@ class StratumServer(networkserver.AsyncSocketServer):
 		for username in self.PrivateMining:
 			(pmConfig, JobBytes, refreshed) = self.PrivateMining[username]
 			cbValue = txn.outputs[0][0];
-			profit = ceil(cbValue  * pmConfig[1])
-			txn.addOutput(profit, txn.outputs[0][1])
-			txn.outputs[0] = (cbValue - profit, pmConfig[0])
+			if pmConfig[1]:
+				profit = ceil(cbValue  * pmConfig[1])
+				txn.addOutput(profit, txn.outputs[0][1])
+				txn.outputs[0] = (cbValue - profit, pmConfig[0])
+			else:
+				txn.outputs[0] = (cbValue, pmConfig[0])
 			txn.assemble()
 			JobBytes = json.dumps({
 				'id': None,

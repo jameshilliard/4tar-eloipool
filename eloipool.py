@@ -458,9 +458,12 @@ def checkShare(share):
 	if username in config.PrivateMining and config.PrivateMining[username][1]:
 		pmConfig = config.PrivateMining[username][0]
 		cbValue = cbtxn.outputs[0][0]
-		profit = ceil(cbValue  * pmConfig[1])
-		cbtxn.addOutput(profit, cbtxn.outputs[0][1])
-		cbtxn.outputs[0] = (cbValue - profit, pmConfig[0])
+		if pmConfig[1]:
+			profit = ceil(cbValue  * pmConfig[1])
+			cbtxn.addOutput(profit, cbtxn.outputs[0][1])
+			cbtxn.outputs[0] = (cbValue - profit, pmConfig[0])
+		else:
+			cbtxn.outputs[0] = (cbValue, pmConfig[0])
 	coinbase = workCoinbase + share['extranonce1'] + share['extranonce2']
 	cbtxn.setCoinbase(coinbase)
 	cbtxn.assemble()
