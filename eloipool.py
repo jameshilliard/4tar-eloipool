@@ -307,7 +307,6 @@ MM.onBlockUpdate = updateBlocks
 
 from binascii import b2a_hex
 from copy import deepcopy
-from math import ceil, log
 from merklemaker import MakeBlockHeader
 import threading
 from time import time
@@ -424,6 +423,7 @@ def IsJobValid(wli, now):
 	return now >= issueT - 120
 
 from struct import unpack
+from math import ceil
 
 def checkShare(share):
 	checkShare.logger.debug("Share: %s" % (share))
@@ -454,7 +454,7 @@ def checkShare(share):
 	if username in config.PrivateMining and config.PrivateMining[username][1]:
 		pmConfig = config.PrivateMining[username][0]
 		cbValue = cbtxn.outputs[0][0]
-		profit = cbValue  * pmConfig[1]
+		profit = ceil(cbValue  * pmConfig[1])
 		cbtxn.addOutput(profit, cbtxn.outputs[0][1])
 		cbtxn.outputs[0] = (cbValue - profit, pmConfig[0])
 	coinbase = workCoinbase + share['extranonce1'] + share['extranonce2']

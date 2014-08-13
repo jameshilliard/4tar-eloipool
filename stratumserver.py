@@ -24,6 +24,7 @@ import networkserver
 import socket
 import struct
 from time import time
+from math import ceil
 import traceback
 from util import RejectedShare, swap32, target2bdiff, UniqueSessionIdManager
 
@@ -401,7 +402,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		for username in self.PrivateMining:
 			(pmConfig, JobBytes, refreshed) = self.PrivateMining[username]
 			cbValue = txn.outputs[0][0];
-			profit = cbValue  * pmConfig[1]
+			profit = ceil(cbValue  * pmConfig[1])
 			txn.addOutput(profit, txn.outputs[0][1])
 			txn.outputs[0] = (cbValue - profit, pmConfig[0])
 			txn.assemble()
