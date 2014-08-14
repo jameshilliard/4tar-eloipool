@@ -14,10 +14,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from base58 import b58decode
+from base58 import b58decode, b58encode
 from util import dblsha
 
-def _Address2PKH(addr):
+def _Address2PKH(addr, check=True):
 	try:
 		addr = b58decode(addr, 25)
 	except:
@@ -25,11 +25,22 @@ def _Address2PKH(addr):
 	if addr is None:
 		return None
 	ver = addr[0]
-	cksumA = addr[-4:]
-	cksumB = dblsha(addr[:-4])[:4]
-	if cksumA != cksumB:
-		return None
+	if check:
+		cksumA = addr[-4:]
+		cksumB = dblsha(addr[:-4])[:4]
+		if cksumA != cksumB:
+			return None
 	return (ver, addr[1:-4])
+
+def _PKH2Address(ver, pkh):
+	addr = ver + pkh
+	addr = addr + dblsha(addr)[:4]
+	addr = '1' + b58encode(addr)
+	if len(addr) == 33 or len(addr) == 34:
+		d = _Address2PKH(addr, False)
+		if d and d[0] == ver[0] and d[1] == pkh:
+			return addr
+	return None
 
 class BitcoinScript:
 	@classmethod
@@ -43,6 +54,22 @@ class BitcoinScript:
 		elif ver == 5 or ver == 196:
 			return b'\xa9\x14' + pubkeyhash + '\x87'
 		raise ValueError('invalid address version')
+
+	@classmethod
+	def fromScript(cls, script):
+		if len(script) == 25:
+			if script[:3] == b'\x76\xa9\x14' and script[-2:] == b'\x88\xac':
+				addr = _PKH2Address(b'\0', script[3:-2])
+				if not addr:
+					addr = _PKH2Address(b'\111', script[3:-2])
+		if len(script) == 23:
+			if script[:2] == b'xa9\x14' and script[-1:] == b'\x87':
+				addr = _PKH2Address(b'\5', script[3:-2])
+				if not addr:
+					addr = _PKH2Address(b'\196', script[3:-2])
+		if addr:
+			return addr
+		raise ValueError('invalid script')
 
 def countSigOps(s):
 	# FIXME: don't count data as ops
