@@ -64,9 +64,9 @@ class BitcoinScript:
 					addr = _PKH2Address(b'\111', script[3:-2])
 		if len(script) == 23:
 			if script[:2] == b'xa9\x14' and script[-1:] == b'\x87':
-				addr = _PKH2Address(b'\5', script[3:-2])
+				addr = _PKH2Address(b'\5', script[2:-1])
 				if not addr:
-					addr = _PKH2Address(b'\196', script[3:-2])
+					addr = _PKH2Address(b'\196', script[2:-1])
 		if addr:
 			return addr
 		raise ValueError('invalid script')
