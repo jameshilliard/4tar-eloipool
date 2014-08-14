@@ -277,7 +277,7 @@ class StratumHandler(networkserver.SocketHandler):
 		return True
 
 	def _stratum_mining_authorize(self, username, password = None):
-		self.UN = username
+		self.UN = username.split('.')[0]
 		self.changeTask(self.sendJob, 0)
 		return True
 		#try:
