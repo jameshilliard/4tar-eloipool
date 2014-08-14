@@ -478,12 +478,12 @@ def checkShare(share):
 			raise RejectedShare('duplicate')
 		DupeShareHACK[data] = None
 
-		blkhash = dblsha(data)
-		#if blkhash[28:] != b'\0\0\0\0':
-		#	raise RejectedShare('H-not-zero')
-		blkhashn = LEhash2int(blkhash)
-		if blkhashn > config.ShareTarget:
-			raise RejectedShare('H-not-zero')
+	blkhash = dblsha(data)
+	#if blkhash[28:] != b'\0\0\0\0':
+	#	raise RejectedShare('H-not-zero')
+	blkhashn = LEhash2int(blkhash)
+	if blkhashn > config.ShareTarget:
+		raise RejectedShare('H-not-zero')
 
 	global networkTarget
 	logfunc = getattr(checkShare.logger, 'info' if blkhashn <= networkTarget else 'debug')
