@@ -35,11 +35,17 @@ class StratumError(BaseException):
 		self.StratumTB = tb
 
 StratumCodes = {
+	'unknown': 20,
 	'stale-prevblk': 21,
 	'stale-work': 21,
 	'duplicate': 22,
-	'H-not-zero': 23,
+	'h-not-zero': 23,
 	'high-hash': 23,
+	'unauthorized': 24,
+	'not-subscribed': 25,
+	'no-txlist-for-vpm': 26,
+	'stale-txlist-req': 26,
+	'too-frequent-txlist-req': 26
 }
 
 class StratumHandler(networkserver.SocketHandler):
@@ -291,13 +297,14 @@ class StratumHandler(networkserver.SocketHandler):
 
 	def _stratum_mining_get_transactions(self, jobid):
 		if self.VPM:
-			raise StratumError(25, 'no-txlist-request-for-vpm-user', False)
+			raise StratumError(26, 'no-txlist-for-vpm', False)
 
 		jobid = int(jobid)
 		if jobid != self.server.JobId or jobid == self.lastSubmitJobId:
-			raise StratumError(25, 'stale-txlist-request', False)
+			raise StratumError(26, 'stale-txlist-req', False)
 		if self.lastGetTxnsJobId and jobid - self.lastGetTxnsJobId < self.server.GetTxnsInterval:
-			raise StratumError(26, 'too-frequent-txlist-request', False)
+			raise StratumError(26, 'too-frequent-txlist-req', False)
+
 		self.lastGetTxnsJobId = jobid
 
 		try:
