@@ -35,7 +35,10 @@ def _Address2PKH(addr, check=True):
 def _PKH2Address(ver, pkh):
 	addr = ver + pkh
 	addr = addr + dblsha(addr)[:4]
-	addr = '1' + b58encode(addr)
+	if ver == b'\0':
+		addr = '1' + b58encode(addr)
+	else:
+		addr = b58encode(addr)
 	if len(addr) == 33 or len(addr) == 34:
 		d = _Address2PKH(addr, False)
 		if d and d[0] == ver[0] and d[1] == pkh:
@@ -52,21 +55,18 @@ class BitcoinScript:
 		if ver == 0 or ver == 111:
 			return b'\x76\xa9\x14' + pubkeyhash + b'\x88\xac'
 		elif ver == 5 or ver == 196:
-			return b'\xa9\x14' + pubkeyhash + '\x87'
+			return b'\xa9\x14' + pubkeyhash + b'\x87'
 		raise ValueError('invalid address version')
 
 	@classmethod
-	def fromScript(cls, script):
+	def fromScript(cls, script, testnet=False):
+		addr = None
 		if len(script) == 25:
 			if script[:3] == b'\x76\xa9\x14' and script[-2:] == b'\x88\xac':
-				addr = _PKH2Address(b'\0', script[3:-2])
-				if not addr:
-					addr = _PKH2Address(b'\111', script[3:-2])
+				addr = _PKH2Address(b'\111' if testnet else b'\0', script[3:-2],)
 		if len(script) == 23:
-			if script[:2] == b'xa9\x14' and script[-1:] == b'\x87':
-				addr = _PKH2Address(b'\5', script[2:-1])
-				if not addr:
-					addr = _PKH2Address(b'\196', script[2:-1])
+			if script[:2] == b'\xa9\x14' and script[-1:] == b'\x87':
+				addr = _PKH2Address(b'\196' if testnet else b'\5', script[2:-1])
 		if addr:
 			return addr
 		raise ValueError('invalid script')
