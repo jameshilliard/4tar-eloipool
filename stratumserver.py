@@ -290,6 +290,9 @@ class StratumHandler(networkserver.SocketHandler):
 		#return valid
 
 	def _stratum_mining_get_transactions(self, jobid):
+		if self.VPM:
+			raise StratumError(25, 'no-txlist-request-for-vpm-user', False)
+
 		jobid = int(jobid)
 		if jobid != self.server.JobId or jobid == self.lastSubmitJobId:
 			raise StratumError(25, 'stale-txlist-request', False)
