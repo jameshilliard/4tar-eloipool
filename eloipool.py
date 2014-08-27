@@ -711,7 +711,7 @@ def _exit(restart):
 		os.kill(os.getpid(), signal.SIGTERM)
 		sys.exit(0)
 
-def exit(restart = False, newThread = False)
+def exit(restart = False, newThread = False):
 	if newThread:
 		exit_thr = threading.Thread(target = _exit, args = (restart))
 		exit_thr.daemon = True
