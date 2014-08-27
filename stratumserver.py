@@ -58,13 +58,13 @@ class StratumHandler(networkserver.SocketHandler):
 		self.target = self.server.defaultTarget
 		#self.server.schedule(self.sendLicenseNotice, time() + 4, errHandler=self)
 		self.set_terminator(b"\n")
+		self.submitTimeCount = 0
 		self.lastSubmitTime = 0
 		self.lastSubmitJobId = 0
 		self.lastGetTxnsJobId = 0
-		self.submitTimeCount = 0
 		self.JobTargets = collections.OrderedDict()
 		self.UN = self.UA = None
-		self.VPM = False
+		self.VPM = self.Authorized = self.Subscribed = False
 		#self.LicenseSent = agplcompliance._SourceFiles is None
 
 	def sendReply(self, ob):
@@ -191,6 +191,10 @@ class StratumHandler(networkserver.SocketHandler):
 			del self._sid
 			raise self.server.RaiseRedFlags(RuntimeError('issuing duplicate sessionid'))
 
+		self.Subscribed = True
+		if self.Authorized:
+			self.changeTask(self.sendJob, 0)
+
 		xid = struct.pack('=I', self._sid)  # NOTE: Assumes sessionids are 4 bytes
 		self.extranonce1 = xid
 		xid = b2a_hex(xid).decode('ascii')
@@ -284,7 +288,9 @@ class StratumHandler(networkserver.SocketHandler):
 
 	def _stratum_mining_authorize(self, username, password = None):
 		self.UN = username.split('.')[0]
-		self.changeTask(self.sendJob, 0)
+		self.Authorized = True
+		if self.Subscribed:
+			self.changeTask(self.sendJob, 0)
 		return True
 		#try:
 		#	valid = self.server.checkAuthentication(username, password)
