@@ -810,6 +810,7 @@ if __name__ == "__main__":
 	stratumsrv.receiveShare = receiveShare
 	stratumsrv.RaiseRedFlags = RaiseRedFlags
 	stratumsrv.IsJobValid = IsJobValid
+	stratumsrv.restartApp = restart
 	#stratumsrv.checkAuthentication = checkAuthentication
 	if not hasattr(config, 'StratumAddresses'):
 		config.StratumAddresses = ()

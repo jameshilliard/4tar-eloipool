@@ -257,7 +257,7 @@ class StratumHandler(networkserver.SocketHandler):
 				'method': 'mining.set_difficulty',
 				'params': [ newBdiff ],
 			})
-		self.lastSubmitTime = submitTime
+		self.server.lastSubmitTime = self.lastSubmitTime = submitTime
 
 		self.lastSubmitJobId = jobid = int(jobid)
 		share = {
@@ -350,6 +350,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.MinSubmitInterval = 0
 		self.MaxSubmitInterval = 0
 		self.GetTxnsInterval = 0
+		self.lastSubmitTime = time()
 		self.PrivateMining = {}
 
 	def checkAuthentication(self, username, password):
@@ -365,9 +366,11 @@ class StratumServer(networkserver.AsyncSocketServer):
 				self.logger.warning('Coinbase too big for stratum: disabling')
 			self.rejecting = True
 			self.boot_all()
-			self.UpdateTask = self.schedule(self.updateJob, time() + 10)
-			return
-		elif self.rejecting:
+			now = time()
+			self.UpdateTask = self.schedule(self.updateJob, now + 10)
+			return now
+
+		if self.rejecting:
 			self.rejecting = False
 			self.logger.info('Coinbase small enough for stratum again: re-enabling')
 
@@ -447,6 +450,8 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.JobId = JobId
 		self.Height = height
 
+		return now
+
 	def updateJob(self, wantClear = False, networkTarget = None):
 		if self.UpdateTask:
 			try:
@@ -457,7 +462,10 @@ class StratumServer(networkserver.AsyncSocketServer):
 		if networkTarget:
 			self.networkTarget = networkTarget
 
-		self.updateJobOnly(wantClear=wantClear)
+		now = self.updateJobOnly(wantClear=wantClear)
+		if wantClear and now - self.lastSubmitTime > 10:
+			self.restartApp()
+			return
 
 		self.WakeRequest = 1
 		self.wakeup()
