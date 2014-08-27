@@ -695,29 +695,29 @@ def saveState(SAVE_STATE_FILENAME, t = None):
 				except:
 					logger.error(('Failed to unlink \'%s\'; resume may have trouble\n' % (SAVE_STATE_FILENAME,)) + traceback.format_exc())
 
-def _exit(restart):
+def _exitApp(restart):
 	t = time()
 	stopServers()
 	stopLoggers()
 	saveState(config.SaveStateFilename, t=t)
 	if restart:
-		logging.getLogger('restart').info('Restarting...')
+		logging.getLogger('exitApp').info('Restarting...')
 		try:
 			os.execv(sys.argv[0], sys.argv)
 		except:
-			logging.getLogger('restart').error('Failed to exec\n' + traceback.format_exc())
+			logging.getLogger('exitApp').error('Failed to exec\n' + traceback.format_exc())
 	else:
-		logging.getLogger('exit').info('Goodbye...')
+		logging.getLogger('exitApp').info('Goodbye...')
 		os.kill(os.getpid(), signal.SIGTERM)
 		sys.exit(0)
 
-def exit(restart = False, newThread = False):
+def exitApp(restart = False, newThread = False):
 	if newThread:
-		exit_thr = threading.Thread(target = _exit, args = (restart))
+		exit_thr = threading.Thread(target = _exitApp, args = (restart,))
 		exit_thr.daemon = True
 		exit_thr.start()
 	else:
-		_exit(restart)
+		_exitApp(restart)
 
 def restoreState(SAVE_STATE_FILENAME):
 	if not os.path.exists(SAVE_STATE_FILENAME):
@@ -764,7 +764,6 @@ def restoreState(SAVE_STATE_FILENAME):
 
 
 from networkserver import NetworkListener
-import threading
 import sharelogging
 import authentication
 from stratumserver import StratumServer
@@ -825,7 +824,7 @@ if __name__ == "__main__":
 	stratumsrv.receiveShare = receiveShare
 	stratumsrv.RaiseRedFlags = RaiseRedFlags
 	stratumsrv.IsJobValid = IsJobValid
-	stratumsrv.restartApp = exit
+	stratumsrv.restartApp = exitApp
 	#stratumsrv.checkAuthentication = checkAuthentication
 	if not hasattr(config, 'StratumAddresses'):
 		config.StratumAddresses = ()
