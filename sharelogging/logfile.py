@@ -19,6 +19,7 @@
 
 from collections import deque
 from datetime import date
+from binascii import b2a_hex
 from time import sleep, time
 import threading
 from util import shareLogFormatter
@@ -40,9 +41,10 @@ class logfile(threading.Thread):
 		self.start()
 
 	def flushlog(self):
+		logfile = None
 		while len(self.queue) > 0:
 			(idx, logline) = self.queue.popleft()
-			if idx != self.idx:
+			if logfile is None or idx != self.idx:
 				self.idx = idx
 				logfile = open(self.fn + '.' + str(self.idx), 'a')
 			logfile.write(logline)
