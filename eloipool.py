@@ -552,7 +552,7 @@ def checkShare(share):
 
 checkShare.logger = logging.getLogger('checkShare')
 
-def logJob(jobBytes, height)
+def logJob(jobBytes, height):
 	for i in shareLoggers:
 		i.logJob(jobBytes, height)
 
