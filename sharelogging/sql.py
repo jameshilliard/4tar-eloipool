@@ -108,6 +108,9 @@ class sql:
 	def _connect(self):
 		self.db = self._mod.connect(**self.opts.get('dbopts', {}))
 
+	def logJob(self, jobBytes, height)
+		pass
+
 	def logShare(self, share):
 		o = self.pstmt.applyToShare(share)
 		self._logShareF(o)

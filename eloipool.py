@@ -552,6 +552,10 @@ def checkShare(share):
 
 checkShare.logger = logging.getLogger('checkShare')
 
+def logJob(jobBytes, height)
+	for i in shareLoggers:
+		i.logJob(jobBytes, height)
+
 def logShare(share):
 	#if '_origdata' in share:
 	#	share['solution'] = share['_origdata']
@@ -802,6 +806,7 @@ if __name__ == "__main__":
 	stratumsrv.PrivateMining = config.PrivateMining
 	stratumsrv.getStratumJob = getStratumJob
 	stratumsrv.getExistingStratumJob = getExistingStratumJob
+	stratumsrv.logJob = logJob
 	stratumsrv.receiveShare = receiveShare
 	stratumsrv.RaiseRedFlags = RaiseRedFlags
 	stratumsrv.IsJobValid = IsJobValid
