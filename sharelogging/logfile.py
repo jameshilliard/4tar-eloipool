@@ -19,7 +19,6 @@
 
 from collections import deque
 from datetime import date
-from binascii import b2a_hex
 from time import sleep, time
 import threading
 from util import shareLogFormatter
@@ -57,7 +56,7 @@ class logfile(threading.Thread):
 				_logger.critical(traceback.format_exc())
 
 	def logJob(self, jobBytes, height):
-		logitem = (height, b2a_hex(jobBytes).decode('ascii'))
+		logitem = (height, jobBytes.decode('ascii'))
 		self.queue.append(logitem)
 
 	def logShare(self, share):
