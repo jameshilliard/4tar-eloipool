@@ -463,8 +463,8 @@ class StratumServer(networkserver.AsyncSocketServer):
 			self.networkTarget = networkTarget
 
 		now = self.updateJobOnly(wantClear=wantClear)
-		if wantClear and now - self.lastSubmitTime > 10:
-			self.restartApp()
+		if wantClear and now - self.lastSubmitTime > self.RestartInterval:
+			self.restartApp(True, True)
 			return
 
 		self.WakeRequest = 1

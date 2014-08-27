@@ -32,7 +32,7 @@ config = None
 def loadConfig(confMod, init = False):
 	global config
 
-	rl = [ 0, 0, 0, 0 ]
+	rl = [ 0, 0, 0, 0, 0 ]
 
 	if init:
 		__import__(confMod)
@@ -55,7 +55,7 @@ def loadConfig(confMod, init = False):
 			addr = BitcoinScript.toAddress(config.TrackerAddr[1][username][0])
 			config.PrivateMining[username] = ( [ addr, config.TrackerAddr[1][username][1] ], b'', 0 )
 
-		rl[0] = rl[1] = rl[2] = rl[3] = 1
+		rl[0] = rl[1] = rl[2] = rl[3] = rl[4] = 1
 	else:
 		r = 0
 
@@ -83,6 +83,10 @@ def loadConfig(confMod, init = False):
 						r += 1
 						rl[3] = 1
 						config.GetTxnsInterval = int(a[1].strip())
+					elif a[0] == "RestartInterval":
+						r += 1
+						rl[4] = 1
+						config.RestartInterval = int(a[1].strip())
 					elif a[0] == 'TrackerAddr':
 						taStep = 1
 					elif taStep == 1 and a[0] == '{':
@@ -117,12 +121,12 @@ def loadConfig(confMod, init = False):
 									ctas[name] = [ addr, perc ]
 									cpms[name] = ( [ BitcoinScript.toAddress(addr), perc ], b'', 1 )
 
-					if r == 5:
+					if r == 6:
 						break
 		finally:
 			conf.close()
 
-		if r == 5:
+		if r == 6:
 			return
 
 	if not rl[0] or not hasattr(config, 'ShareTarget'):
@@ -133,6 +137,8 @@ def loadConfig(confMod, init = False):
 		config.MaxSubmitInterval = 100
 	if not rl[3] or not hasattr(config, 'GetTxnsInterval'):
 		config.GetTxnsInterval = 10
+	if not rl[4] or not hasattr(config, 'RestartInterval'):
+		config.RestartInterval = 601
 
 loadConfig(configmod, True)
 
@@ -278,6 +284,9 @@ def poolWorker(wl, ss):
 			if ss.GetTxnsInterval != config.GetTxnsInterval:
 				refreshConf += (", " if refreshConf else "") + "GetTxnsInterval"
 				ss.GetTxnsInterval = config.GetTxnsInterval
+			if ss.RestartInterval != config.RestartInterval:
+				refreshConf += (", " if refreshConf else "") + "RestartInterval"
+				ss.RestartInterval = config.RestartInterval
 			if refreshConf:
 				poolWorker.logger.info('Refresh config item %s' % (refreshConf,))
 
@@ -646,7 +655,7 @@ def stopServers():
 		sl = []
 		for s in servers:
 			if s.running:
-				sl.append(s.__class__.__name__)
+				sl.append(s.__class__.__name__ + "." + s.doing)
 		if not sl:
 			break
 		i += 1
@@ -686,25 +695,29 @@ def saveState(SAVE_STATE_FILENAME, t = None):
 				except:
 					logger.error(('Failed to unlink \'%s\'; resume may have trouble\n' % (SAVE_STATE_FILENAME,)) + traceback.format_exc())
 
-def exit():
+def _exit(restart):
 	t = time()
 	stopServers()
 	stopLoggers()
 	saveState(config.SaveStateFilename, t=t)
-	logging.getLogger('exit').info('Goodbye...')
-	os.kill(os.getpid(), signal.SIGTERM)
-	sys.exit(0)
+	if restart:
+		logging.getLogger('restart').info('Restarting...')
+		try:
+			os.execv(sys.argv[0], sys.argv)
+		except:
+			logging.getLogger('restart').error('Failed to exec\n' + traceback.format_exc())
+	else:
+		logging.getLogger('exit').info('Goodbye...')
+		os.kill(os.getpid(), signal.SIGTERM)
+		sys.exit(0)
 
-def restart():
-	t = time()
-	stopServers()
-	stopLoggers()
-	saveState(config.SaveStateFilename, t=t)
-	logging.getLogger('restart').info('Restarting...')
-	try:
-		os.execv(sys.argv[0], sys.argv)
-	except:
-		logging.getLogger('restart').error('Failed to exec\n' + traceback.format_exc())
+def exit(restart = False, newThread = False)
+	if newThread:
+		exit_thr = threading.Thread(target = _exit, args = (restart))
+		exit_thr.daemon = True
+		exit_thr.start()
+	else:
+		_exit(restart)
 
 def restoreState(SAVE_STATE_FILENAME):
 	if not os.path.exists(SAVE_STATE_FILENAME):
@@ -741,6 +754,7 @@ def restoreState(SAVE_STATE_FILENAME):
 					workLog = pickle.load(f)
 				else:
 					logger.debug('Skipping restore of expired workLog')
+		os.remove(SAVE_STATE_FILENAME)
 	except:
 		logger.error('Failed to restore state\n' + traceback.format_exc())
 		return
@@ -803,6 +817,7 @@ if __name__ == "__main__":
 	stratumsrv.MinSubmitInterval = config.MinSubmitInterval
 	stratumsrv.MaxSubmitInterval = config.MaxSubmitInterval
 	stratumsrv.GetTxnsInterval = config.GetTxnsInterval
+	stratumsrv.RestartInterval = config.RestartInterval
 	stratumsrv.PrivateMining = config.PrivateMining
 	stratumsrv.getStratumJob = getStratumJob
 	stratumsrv.getExistingStratumJob = getExistingStratumJob
@@ -810,7 +825,7 @@ if __name__ == "__main__":
 	stratumsrv.receiveShare = receiveShare
 	stratumsrv.RaiseRedFlags = RaiseRedFlags
 	stratumsrv.IsJobValid = IsJobValid
-	stratumsrv.restartApp = restart
+	stratumsrv.restartApp = exit
 	#stratumsrv.checkAuthentication = checkAuthentication
 	if not hasattr(config, 'StratumAddresses'):
 		config.StratumAddresses = ()
