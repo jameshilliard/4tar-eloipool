@@ -20,6 +20,8 @@
 from collections import deque
 from datetime import date
 from time import sleep, time
+from os import lstat, remove, symlink
+from stat import S_ISLNK
 import threading
 from util import shareLogFormatter
 import logging
@@ -44,8 +46,19 @@ class logfile(threading.Thread):
 		while len(self.queue) > 0:
 			(idx, logline) = self.queue.popleft()
 			if logfile is None or idx != self.idx:
+				fn = self.fn + '.' + str(idx)
+				logfile = open(fn, 'a')
+				if idx > self.idx:
+					try:
+						if S_ISLNK(lstat(self.fn).st_mode):
+							remove(self.fn)
+					except:
+						pass
+					try:
+						symlink(fn, self.fn)
+					except:
+						pass
 				self.idx = idx
-				logfile = open(self.fn + '.' + str(self.idx), 'a')
 			logfile.write(logline)
 
 	def run(self):
@@ -56,8 +69,8 @@ class logfile(threading.Thread):
 			except:
 				_logger.critical(traceback.format_exc())
 
-	def logJob(self, jobBytes, height):
-		logitem = (height, jobBytes.decode('ascii'))
+	def logJob(self, jobBytes, height, now):
+		logitem = (height, str(now) + " " + jobBytes.decode('ascii'))
 		self.queue.append(logitem)
 
 	def logShare(self, share):

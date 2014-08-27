@@ -108,7 +108,7 @@ class sql:
 	def _connect(self):
 		self.db = self._mod.connect(**self.opts.get('dbopts', {}))
 
-	def logJob(self, jobBytes, height):
+	def logJob(self, jobBytes, height, now):
 		pass
 
 	def logShare(self, share):
