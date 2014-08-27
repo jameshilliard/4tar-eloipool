@@ -19,7 +19,6 @@
 
 from collections import deque
 from datetime import date
-from binascii import b2a_hex
 from time import sleep, time
 import threading
 from util import shareLogFormatter
