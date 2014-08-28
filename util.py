@@ -28,9 +28,9 @@ def YN(b):
 
 def UPK(b):
 	if len(b) == 4:
-		return unpack('>L', b)
+		return unpack('>L', b)[0]
 	elif len(b) == 8:
-		return unpack('>Q', b)
+		return unpack('>Q', b)[0]
 	else:
 		return '-'
 
