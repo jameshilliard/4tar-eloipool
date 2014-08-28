@@ -418,14 +418,20 @@ class StratumServer(networkserver.AsyncSocketServer):
 				],
 			}).encode('ascii') + b"\n"
 
+		payoutCount = len(txn.outputs)		# Should always be 1 in our implementation
+		(cbValue, ourAddr) = txn.outputs[0]	# So should be the only one
 		for username in self.PrivateMining:
 			(pmConfig, JobBytes, refreshed) = self.PrivateMining[username]
-			cbValue = txn.outputs[0][0];
 			if pmConfig[1]:
 				profit = ceil(cbValue  * pmConfig[1])
-				txn.addOutput(profit, txn.outputs[0][1])
+				if payoutCount == len(txn.outputs):
+					txn.addOutput(profit, ourAddr)
+				else:
+					txn.outputs[payoutCount] = (profit, ourAddr)
 				txn.outputs[0] = (cbValue - profit, pmConfig[0])
 			else:
+				if payoutCount < len(txn.outputs):
+					txn.outputs = txn.outputs[:-1]
 				txn.outputs[0] = (cbValue, pmConfig[0])
 			txn.assemble()
 			JobBytes = json.dumps({
