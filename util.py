@@ -26,6 +26,14 @@ def YN(b):
 		return None
 	return 'Y' if b else 'N'
 
+def UPK(b):
+	if len(b) == 4:
+		return unpack('>L', b)
+	elif len(b) == 8:
+		return unpack('>Q', b)
+	else:
+		return '-'
+
 def _maybe_int(n):
 	n_int = int(n)
 	if n == n_int:

@@ -44,7 +44,7 @@ class logfile(threading.Thread):
 	def flushlog(self):
 		logfile = None
 		while len(self.queue) > 0:
-			(idx, logline) = self.queue.popleft()
+			(idx, logitem) = self.queue.popleft()
 			if logfile is None or idx != self.idx:
 				fn = self.fn + '.' + str(idx)
 				logfile = open(fn, 'a')
@@ -59,7 +59,10 @@ class logfile(threading.Thread):
 					except:
 						pass
 				self.idx = idx
-			logfile.write(logline)
+			if isinstance(logitem, str):
+				logfile.write(logitem)
+			else:
+				logfile.write(self.fmt.formatShare(logitem))
 
 	def run(self):
 		while True:
@@ -74,5 +77,5 @@ class logfile(threading.Thread):
 		self.queue.append(logitem)
 
 	def logShare(self, share):
-		logitem = (share['height'], self.fmt.formatShare(share))
+		logitem = (share['height'], share)
 		self.queue.append(logitem)
