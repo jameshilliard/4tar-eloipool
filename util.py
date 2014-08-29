@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from binascii import b2a_hex
 from hashlib import sha256
 from math import log
 import re
@@ -33,6 +34,9 @@ def UPK(b):
 		return unpack('>Q', b)[0]
 	else:
 		return '-'
+
+def HEX(b):
+	return b2a_hex(b).decode('ascii')
 
 def _maybe_int(n):
 	n_int = int(n)

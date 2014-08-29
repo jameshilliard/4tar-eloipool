@@ -203,7 +203,7 @@ ShareLogging = (
 	{
 		'type': 'logfile',
 		'filename': 'share-logfile',
-		'format': "{time} {Q(remoteHost)} {username} {YN(not(rejectReason))} {dash(YN(upstreamResult))} {dash(rejectReason)} 0 {jobid} {diff} {UPK(extranonce1)} {UPK(extranonce2)} {UPK(ntime)} {UPK(nonce)}\n",
+		'format': "{time} {Q(remoteHost)} {username} {YN(not(rejectReason))} {dash(YN(upstreamResult))} {dash(rejectReason)} 0 {jobid} {diff} {HEX(extranonce1)} {HEX(extranonce2)} {UPK(ntime)} {HEX(nonce)}\n",
 	},
 	{
 		'type': 'sql',
