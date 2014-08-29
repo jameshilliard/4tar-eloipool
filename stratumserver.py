@@ -342,7 +342,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		super().__init__(*a, **ka)
 
 		self._Clients = {}
-		self.JobId = 0
+		self.JobId = -1
 		self.Height = 0
 		self.WakeRequest = None
 		self.UpdateTask = None
@@ -357,7 +357,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		return True
 
 	def updateJobOnly(self, wantClear = False):
-		JobId = self.JobId + 1
+		JobId = self.JobId + 1 if self.JobId < 999 else 0
 		(MC, now) = self.getStratumJob(JobId, wantClear=wantClear)
 		(height, merkleTree, cb, prevBlock, bits) = MC[:5]
 
