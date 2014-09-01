@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #import agplcompliance
+import threading
 from binascii import b2a_hex
 import collections
 from copy import deepcopy
@@ -144,6 +145,9 @@ class StratumHandler(networkserver.SocketHandler):
 #		self.LicenseSent = True
 
 	def sendJob(self):
+		if self.server.JobId in self.JobTargets:
+			return
+
 		if not len(self.JobTargets):
 			diff = target2bdiff(self.target)
 			self.logger.debug("Initialize difficulty to %s for %s@%s" % (diff, self.UN, str(self.addr)))
@@ -155,9 +159,10 @@ class StratumHandler(networkserver.SocketHandler):
 
 		#self.logger.debug("sendJob to %s@%s" % (self.UN, str(self.addr)))
 
-		if self.UN in self.server.PrivateMining and self.server.PrivateMining[self.UN][1]:
-			self.VPM = True
-			self.push(self.server.PrivateMining[self.UN][1])
+		if self.UN in self.server.PrivateMining:
+			if self.server.PrivateMining[self.UN][1]:
+				self.VPM = True
+				self.push(self.server.PrivateMining[self.UN][1])
 		else:
 			if self.VPM:
 				self.VPM = False
@@ -260,6 +265,9 @@ class StratumHandler(networkserver.SocketHandler):
 		self.server.lastSubmitTime = self.lastSubmitTime = submitTime
 
 		self.lastSubmitJobId = jobid = int(jobid)
+		if jobid != self.server.JobId and self.server.JobId not in self.JobTargets:
+			self.sendJob()
+
 		share = {
 			'username': username,
 			'remoteHost': self.remoteHost,
@@ -344,7 +352,6 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self._Clients = {}
 		self.JobId = -1
 		self.Height = 0
-		self.WakeRequest = None
 		self.UpdateTask = None
 		self.networkTarget = None
 		self.MinSubmitInterval = 0
@@ -352,6 +359,8 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.GetTxnsInterval = 0
 		self.lastSubmitTime = time()
 		self.PrivateMining = {}
+		self.RestartClientJobEvent = threading.Event()
+		threading.Thread(target = self._RestartClientJob).start() 
 
 	def checkAuthentication(self, username, password):
 		return True
@@ -458,7 +467,38 @@ class StratumServer(networkserver.AsyncSocketServer):
 
 		return now
 
-	def updateJob(self, wantClear = False, networkTarget = None):
+	def _RestartClientJob(self):
+		while self.keepgoing:
+			self.RestartClientJobEvent.wait()
+			if self.keepgoing and self.RestartClientJobEvent.is_set():
+				C = self._Clients
+				if not C:
+					self.logger.debug('Nobody to wake up')
+					return
+				OC = len(C)
+				self.logger.debug("%d clients to wake up..." % (OC,))
+
+				now = time()
+
+				# There is a possibility that in the below loop, the updateJob() has updated the
+				# current job to a non-restart-one, that may cause all after-changing clients not
+				# to get a restart notifcation.
+				# However, current implementation of cgminer/bfgminer would switch to the new job
+				# no matter it is asking for a restart or not, so it should be just fine.
+				# If any problem related to restarting request found, we should check the possiblity.
+				for ic in list(C.values()):
+					try:
+						ic.sendJob()
+					except socket.error:
+						OC -= 1
+						# Ignore socket errors; let the main event loop take care of them later
+					except:
+						OC -= 1
+						self.logger.debug('Error sending new job:\n' + traceback.format_exc())
+
+				self.logger.debug('Restart job sent to %d clients in %.3f seconds' % (OC, time() - now))
+
+	def updateJob(self, wantClear = False, networkTarget = None, refreshVPM = False):
 		if self.UpdateTask:
 			try:
 				self.rmSchedule(self.UpdateTask)
@@ -468,39 +508,12 @@ class StratumServer(networkserver.AsyncSocketServer):
 		if networkTarget:
 			self.networkTarget = networkTarget
 
-		now = self.updateJobOnly(wantClear=wantClear)
-		if wantClear and now - self.lastSubmitTime > self.RestartInterval:
-			self.restartApp(True, True)
-			return
+		now = self.updateJobOnly(wantClear = wantClear)
+		if wantClear or refreshVPM:
+			if now - self.lastSubmitTime > self.RestartInterval:
+				self.restartApp(True, True)
+				return
 
-		self.WakeRequest = 1
-		self.wakeup()
+			self.RestartClientJobEvent.set()
 
-		self.UpdateTask = self.schedule(self.updateJob, time() + 55)
-
-	def pre_schedule(self):
-		if self.WakeRequest:
-			self._wakeNodes()
-
-	def _wakeNodes(self):
-		self.WakeRequest = None
-		C = self._Clients
-		if not C:
-			self.logger.debug('Nobody to wake up')
-			return
-		OC = len(C)
-		self.logger.debug("%d clients to wake up..." % (OC,))
-
-		now = time()
-
-		for ic in list(C.values()):
-			try:
-				ic.sendJob()
-			except socket.error:
-				OC -= 1
-				# Ignore socket errors; let the main event loop take care of them later
-			except:
-				OC -= 1
-				self.logger.debug('Error sending new job:\n' + traceback.format_exc())
-
-		self.logger.debug('New job sent to %d clients in %.3f seconds' % (OC, time() - now))
+		self.UpdateTask = self.schedule(self.updateJob, now + 55)

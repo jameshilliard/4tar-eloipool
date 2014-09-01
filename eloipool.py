@@ -105,7 +105,7 @@ def loadConfig(confMod, init = False):
 								#logging.getLogger("loadConfig").debug('Clear VPM addr: %s' % (name,))
 								del ctas[name], cpms[name]
 							if taStep > 2:
-								stratumsrv.updateJob()
+								stratumsrv.updateJob(refreshVPM = True)
 							taStep = 0
 						elif a[0][0] != '#':
 							b = a[0].split(':')
