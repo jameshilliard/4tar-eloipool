@@ -16,6 +16,7 @@
 
 import logging
 from queue import Queue
+from time import sleep
 import threading
 import traceback
 from util import shareLogFormatter
@@ -46,12 +47,17 @@ class sql:
 			self._logShareF = self._queue.put
 			threading.Thread(target=self._thread).start()
 
-	def _doInsert(self, o):
-		(stmt, params) = o
+	def _doInsert(self, item):
+		if 'bytes' in item:
+			(stmt, params) = self.jobStmt.applyToShare(item)
+		else:
+			(stmt, params) = self.shareStmt.applyToShare(item)
+
 		reconn = 0
-		while reconn < 3:
+		while reconn < 5:
 			try:
 				if reconn:
+					sleep(reconn)
 					self._connect()
 				self.db.cursor().execute(stmt, params)
 				break
@@ -73,10 +79,10 @@ class sql:
 		self._connect()
 		while True:
 			try:
-				o = self._queue.get()
-				if o is None:
+				item = self._queue.get()
+				if item is None:
 					break
-				self._doInsert(o)
+				self._doInsert(item)
 			except:
 				_logger.critical(traceback.format_exc())
 		self._shutdown()
@@ -101,19 +107,23 @@ class sql:
 	def modsetup(self, mod):
 		self._mod = mod
 		psf = self._psf[mod.paramstyle]
+
 		self.opts.setdefault('statement', "insert into shares (remoteHost, username, rejectReason, upstreamResult, solution) values ({remoteHost}, {username}, {rejectReason}, {upstreamResult}, {solution})")
 		stmt = self.opts['statement']
-		self.pstmt = shareLogFormatter(stmt, psf)
+		self.shareStmt = shareLogFormatter(stmt, psf)
+
+		self.opts.setdefault('jobstmt', "call update_job(0, {blkid}, {time}, {reward})")
+		stmt = self.opts['jobstmt']
+		self.jobStmt = shareLogFormatter(stmt, psf)
 
 	def _connect(self):
 		self.db = self._mod.connect(**self.opts.get('dbopts', {}))
 
-	def logJob(self, jobBytes, height, now):
-		pass
+	def logJob(self, job):
+		self._logShareF(job)
 
 	def logShare(self, share):
-		o = self.pstmt.applyToShare(share)
-		self._logShareF(o)
+		self._logShareF(share)
 
 	def stop(self):
 		# NOTE: this is replaced with _shutdown directly for threadsafe objects

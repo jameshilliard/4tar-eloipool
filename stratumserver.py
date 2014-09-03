@@ -460,7 +460,14 @@ class StratumServer(networkserver.AsyncSocketServer):
 			}).encode('ascii') + b"\n"
 			self.PrivateMining[username] = (pmConfig, JobBytes, 0)
 
-		self.logJob(self.JobBytes, height, now)
+		job = {
+			'bytes': self.JobBytes,
+			'id': JobId,
+			'blkid': height,
+			'reward': cbValue,
+			'time': now
+		}
+		self.logJob(job)
 
 		self.JobId = JobId
 		self.Height = height

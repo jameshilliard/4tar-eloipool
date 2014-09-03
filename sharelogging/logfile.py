@@ -72,8 +72,8 @@ class logfile(threading.Thread):
 			except:
 				_logger.critical(traceback.format_exc())
 
-	def logJob(self, jobBytes, height, now):
-		logitem = (height, str(now) + " " + jobBytes.decode('ascii'))
+	def logJob(self, job):
+		logitem = (job['blkid'], str(job['time']) + " " + job['bytes'].decode('ascii'))
 		self.queue.append(logitem)
 
 	def logShare(self, share):

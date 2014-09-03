@@ -304,7 +304,7 @@ def poolWorker(wl, ss):
 							del userwork[wli]
 							pruned += 1
 				if pruned:
-					poolWorker.logger.info('Pruned %d in %d jobs' % (pruned, total))
+					poolWorker.logger.info('Pruned %d of %d jobs' % (pruned, total))
 		except:
 			poolWorker.logger.error(traceback.format_exc())
 poolWorker.logger = logging.getLogger('poolWorker')
@@ -561,9 +561,9 @@ def checkShare(share):
 
 checkShare.logger = logging.getLogger('checkShare')
 
-def logJob(jobBytes, height, now):
+def logJob(job):
 	for i in shareLoggers:
-		i.logJob(jobBytes, height, now)
+		i.logJob(job)
 
 def logShare(share):
 	#if '_origdata' in share:
