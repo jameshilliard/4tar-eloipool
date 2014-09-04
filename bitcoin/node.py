@@ -133,7 +133,7 @@ class BitcoinLink(networkserver.SocketHandler):
 
 	def doInv_2(self, blkhash):  # MSG_BLOCK
 		self.logger.debug('Received block inv from %s for %s' % (self.addr, b2a_hex(blkhash[::-1]).decode('ascii'),))
-		self.server.newBlock(blkhash)
+		self.server.receiveNewBlock(blkhash)
 
 	def doCmd_version(self, payload):
 		# FIXME: check for loopbacks
@@ -152,6 +152,7 @@ class BitcoinNode(networkserver.AsyncSocketServer):
 		self.netid = netid
 		self.userAgent = b'/BitcoinNode:0.1/'
 		self.nonce = 0  # FIXME
+		self.nblkhash = None
 		self._om = deque()
 
 	def pre_schedule(self):
@@ -181,6 +182,11 @@ class BitcoinNode(networkserver.AsyncSocketServer):
 	def submitBlock(self, payload):
 		self._om.append(self.makeMessage('block', payload))
 		self.wakeup()
+
+	def receiveNewBlock(self, blkhash):
+		if self.nblkhash != blkhash:
+			self.newBlock(blkhash)
+			self.nblkhash = blkhash
 
 	def newBlock(self, blkhash):
 		pass

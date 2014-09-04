@@ -794,7 +794,8 @@ if __name__ == "__main__":
 #		LSbc.append(NetworkListener(bcnode, a))
 
 	if hasattr(config, 'UpstreamBitcoindNode') and config.UpstreamBitcoindNode:
-		BitcoinLink(bcnode, dest=config.UpstreamBitcoindNode)
+		for dest in config.UpstreamBitcoindNode:
+			BitcoinLink(bcnode, dest = dest)
 
 	stratumsrv = StratumServer()
 	stratumsrv.defaultTarget = config.ShareTarget
