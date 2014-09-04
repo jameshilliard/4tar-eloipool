@@ -752,6 +752,7 @@ import sharelogging
 import authentication
 from stratumserver import StratumServer
 import imp
+from util import UniqueIdManager
 
 if args.daemon:
 	import daemon
@@ -809,6 +810,10 @@ if __name__ == "__main__":
 	stratumsrv.RaiseRedFlags = RaiseRedFlags
 	stratumsrv.IsJobValid = IsJobValid
 	stratumsrv.restartApp = exitApp
+	if hasattr(config, 'SessionIdRange'):
+		stratumsrv.sidMgr = UniqueIdManager(config.SessionIdRange[0], config.SessionIdRange[1])
+	else:
+		stratumsrv.sidMgr = UniqueIdManager()
 	#stratumsrv.checkAuthentication = checkAuthentication
 	if not hasattr(config, 'StratumAddresses'):
 		config.StratumAddresses = ()
@@ -819,11 +824,11 @@ if __name__ == "__main__":
 
 	restoreState(config.SaveStateFilename)
 
-	worker_thr = threading.Thread(target=poolWorker, args=(workLog, stratumsrv))
+	worker_thr = threading.Thread(target = poolWorker, args = (workLog, stratumsrv))
 	worker_thr.daemon = True
 	worker_thr.start()
 
-	bcnode_thr = threading.Thread(target=bcnode.serve_forever)
+	bcnode_thr = threading.Thread(target = bcnode.serve_forever)
 	bcnode_thr.daemon = True
 	bcnode_thr.start()
 

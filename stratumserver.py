@@ -27,7 +27,7 @@ import struct
 from time import time
 from math import ceil
 import traceback
-from util import RejectedShare, swap32, target2bdiff, UniqueSessionIdManager
+from util import RejectedShare, swap32, target2bdiff
 
 class StratumError(BaseException):
 	def __init__(self, errno, msg, tb = True):
@@ -150,7 +150,7 @@ class StratumHandler(networkserver.SocketHandler):
 
 		if not len(self.JobTargets):
 			diff = target2bdiff(self.target)
-			self.logger.debug("Initialize difficulty to %s for %s@%s" % (diff, self.UN, str(self.addr)))
+			self.logger.debug("Initialize difficulty to %s for %d/%s@%s" % (diff, self._sid, self.UN, str(self.addr)))
 			self.sendReply({
 				'id': None,
 				'method': 'mining.set_difficulty',
@@ -191,7 +191,7 @@ class StratumHandler(networkserver.SocketHandler):
 			self.changeTask(self.requestStratumUA, 0)
 
 		if not hasattr(self, '_sid'):
-			self._sid = UniqueSessionIdManager.get()
+			self._sid = self.server.sidMgr.get()
 		if self.server._Clients.get(self._sid) not in (self, None):
 			del self._sid
 			raise self.server.RaiseRedFlags(RuntimeError('issuing duplicate sessionid'))
@@ -215,7 +215,7 @@ class StratumHandler(networkserver.SocketHandler):
 
 	def close(self):
 		if hasattr(self, '_sid'):
-			UniqueSessionIdManager.put(self._sid)
+			self.server.sidMgr.put(self._sid)
 			delattr(self, '_sid')
 		try:
 			del self.server._Clients[id(self)]
@@ -359,6 +359,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.GetTxnsInterval = 0
 		self.lastSubmitTime = time()
 		self.PrivateMining = {}
+		#self.sidMgr = UniqueIdManager()
 		self.RestartClientJobEvent = threading.Event()
 		threading.Thread(target = self._RestartClientJob).start() 
 
