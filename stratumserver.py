@@ -159,10 +159,11 @@ class StratumHandler(networkserver.SocketHandler):
 
 		#self.logger.debug("sendJob to %s@%s" % (self.UN, str(self.addr)))
 
-		if self.UN in self.server.PrivateMining:
-			if self.server.PrivateMining[self.UN][1]:
+		userName = self.UN.split('.')[0]
+		if userName in self.server.PrivateMining:
+			if self.server.PrivateMining[userName][1]:
 				self.VPM = True
-				self.push(self.server.PrivateMining[self.UN][1])
+				self.push(self.server.PrivateMining[userName][1])
 		else:
 			if self.VPM:
 				self.VPM = False
@@ -188,7 +189,7 @@ class StratumHandler(networkserver.SocketHandler):
 		if not UA is None:
 			self.UA = UA
 		if not self.UA:
-			self.changeTask(self.requestStratumUA, 0)
+			self.requestStratumUA()
 
 		if not hasattr(self, '_sid'):
 			self._sid = self.server.sidMgr.get()
@@ -236,7 +237,7 @@ class StratumHandler(networkserver.SocketHandler):
 						if self.target < self.server.networkTarget:
 							self.target = self.server.networkTarget
 						newBdiff = target2bdiff(self.target)
-						self.logger.debug("Increase difficulty to %s for %s@%s" % (newBdiff, username, str(self.addr)))
+						self.logger.debug("Increase difficulty to %s for %d/%s@%s" % (newBdiff, self._sid, username, str(self.addr)))
 					self.submitTimeCount = 0
 				else:
 					self.submitTimeCount = 1
@@ -250,7 +251,7 @@ class StratumHandler(networkserver.SocketHandler):
 						if self.target > self.server.defaultTarget:
 							self.target = self.server.defaultTarget
 						newBdiff = target2bdiff(self.target)
-						self.logger.debug("Decrease difficulty to %s for %s@%s" % (newBdiff, username, str(self.addr)))
+						self.logger.debug("Decrease difficulty to %s for %d/%s@%s" % (newBdiff, self._sid, username, str(self.addr)))
 					self.submitTimeCount = 0
 				else:
 					self.submitTimeCount = -1
@@ -295,19 +296,11 @@ class StratumHandler(networkserver.SocketHandler):
 		return True
 
 	def _stratum_mining_authorize(self, username, password = None):
-		self.UN = username.split('.')[0]
+		self.UN = username
 		self.Authorized = True
 		if self.Subscribed:
 			self.changeTask(self.sendJob, 0)
 		return True
-		#try:
-		#	valid = self.server.checkAuthentication(username, password)
-		#except:
-		#	valid = False
-		#if valid:
-			#self.Usernames[username] = None
-		#	self.changeTask(self.requestStratumUA, 0)
-		#return valid
 
 	def _stratum_mining_get_transactions(self, jobid):
 		if self.VPM:
