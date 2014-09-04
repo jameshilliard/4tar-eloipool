@@ -28,11 +28,11 @@ from util import dblsha, tryErr
 
 MAX_PACKET_PAYLOAD = 0x200000
 
-def makeNetAddr(addr):
-	timestamp = pack('<L', int(time()))
-	aIP = pack('>BBBB', *map(int, addr[0].split('.')))
-	aPort = pack('>H', addr[1])
-	return timestamp + b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\xff\xff' + aIP + aPort
+#def makeNetAddr(addr):
+#	timestamp = pack('<L', int(time()))
+#	aIP = pack('>BBBB', *map(int, addr[0].split('.')))
+#	aPort = pack('>H', addr[1])
+#	return timestamp + b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\xff\xff' + aIP + aPort
 
 class BitcoinLink(networkserver.SocketHandler):
 	logger = logging.getLogger('BitcoinLink')
@@ -132,7 +132,7 @@ class BitcoinLink(networkserver.SocketHandler):
 				getattr(self, method)(invHash)
 
 	def doInv_2(self, blkhash):  # MSG_BLOCK
-		self.logger.debug('Received block inv over p2p for %s' % (b2a_hex(blkhash[::-1]).decode('ascii'),))
+		self.logger.debug('Received block inv from %s for %s' % (self.addr, b2a_hex(blkhash[::-1]).decode('ascii'),))
 		self.server.newBlock(blkhash)
 
 	def doCmd_version(self, payload):

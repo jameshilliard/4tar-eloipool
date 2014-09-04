@@ -341,7 +341,7 @@ class AsyncSocketServer:
 
 	def __init__(self, RequestHandlerClass):
 		if not hasattr(self, 'ServerName'):
-			self.ServerName = 'Eloipool'
+			self.ServerName = '37pool.com'
 
 		self.RequestHandlerClass = RequestHandlerClass
 
