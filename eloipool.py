@@ -340,8 +340,8 @@ def getExistingStratumJob(jobid):
 shareLoggers = []
 authenticators = []
 
-RBDs = []
-RBPs = []
+#RBDs = []
+#RBPs = []
 
 from bitcoin.varlen import varlenEncode, varlenDecode
 import bitcoin.txn
@@ -488,46 +488,36 @@ def checkShare(share):
 		DupeShareHACK[data] = None
 
 	blkhash = dblsha(data)
-	#if blkhash[28:] != b'\0\0\0\0':
-	#	raise RejectedShare('H-not-zero')
 	blkhashn = LEhash2int(blkhash)
 	if blkhashn > config.ShareTarget:
 		raise RejectedShare('H-not-zero')
 
 	global networkTarget
-	logfunc = getattr(checkShare.logger, 'info' if blkhashn <= networkTarget else 'debug')
-	#logfunc = checkShare.logger.info
-	logfunc('BLKHASH: %64x' % (blkhashn,))
-	logfunc(' TARGET: %64x' % (networkTarget,))
-
-	# NOTE: this isn't actually needed for MC mode, but we're abusing it for a trivial share check...
-	txlist = workMerkleTree.data
-	txlist = [deepcopy(txlist[0]),] + txlist[1:]
-
 	if blkhashn <= networkTarget:
-		logfunc("Submitting upstream")
-		RBDs.append( deepcopy( (data, txlist, share.get('blkdata', None), workMerkleTree, share, wld) ) )
-		payload = share['data']
-		#if len(othertxndata):
-		#	payload += share['blkdata']
-		#else:
-		payload += assembleBlock(data, txlist)[80:]
-		logfunc('Real block payload: %s' % (b2a_hex(payload).decode('utf8'),))
-		RBPs.append(payload)
-		threading.Thread(target=blockSubmissionThread, args=(payload, blkhash, share)).start()
+		# NOTE: this isn't actually needed for MC mode, but we're abusing it for a trivial share check...
+		txlist = workMerkleTree.data
+		txlist = [deepcopy(txlist[0]),] + txlist[1:]
+
+		#RBDs.append( deepcopy( (data, txlist, None, workMerkleTree, share, wld) ) )
+		payload = data + assembleBlock(data, txlist)[80:]
+
+		checkShare.logger.info('Submitting %64x payload: %s' % (blkhashn, b2a_hex(payload).decode('utf8'),))
+
+		#RBPs.append(payload)
+
+		threading.Thread(target = blockSubmissionThread, args = (payload, blkhash, share)).start()
 		bcnode.submitBlock(payload)
+
 		if config.DelayLogForUpstream:
 			share['upstreamRejectReason'] = PendingUpstream
 		else:
 			share['upstreamRejectReason'] = None
 			share['upstreamResult'] = True
+
 		MM.updateBlock(blkhash)
 
 	if not pmConfig:
-		#cbpre = workCoinbase
 		cbpreLen = len(workCoinbase)
-		#if coinbase[:cbpreLen] != cbpre:
-		#	raise RejectedShare('bad-cb-prefix')
 
 		# Filter out known "I support" flags, to prevent exploits
 		for ff in (b'/P2SH/', b'NOP2SH', b'p2sh/CHV', b'p2sh/NOCHV'):
@@ -544,7 +534,6 @@ def checkShare(share):
 			share['target'] *= 2
 			if share['target'] > config.ShareTarget:
 				raise RejectedShare('high-hash')
-		#share['_targethex'] = '%064x' % (share['target'],)
 
 		shareTimestamp = unpack('<L', data[68:72])[0]
 		if shareTime < issueT - 120:
@@ -553,11 +542,6 @@ def checkShare(share):
 			raise RejectedShare('time-too-old')
 		if shareTimestamp > shareTime + 7200:
 			raise RejectedShare('time-too-new')
-
-		#if len(othertxndata):
-		#	allowed = assembleBlock(data, txlist)[80:]
-		#	if allowed != share['blkdata']:
-		#		raise RejectedShare('bad-txns')
 
 checkShare.logger = logging.getLogger('checkShare')
 
@@ -802,11 +786,11 @@ if __name__ == "__main__":
 		except:
 			logging.getLogger('authentication').error("Error setting up authentication module %s: %s", name, sys.exc_info())
 
-	LSbc = []
-	if not hasattr(config, 'BitcoinNodeAddresses'):
-		config.BitcoinNodeAddresses = ()
-	for a in config.BitcoinNodeAddresses:
-		LSbc.append(NetworkListener(bcnode, a))
+#	LSbc = []
+#	if not hasattr(config, 'BitcoinNodeAddresses'):
+#		config.BitcoinNodeAddresses = ()
+#	for a in config.BitcoinNodeAddresses:
+#		LSbc.append(NetworkListener(bcnode, a))
 
 	if hasattr(config, 'UpstreamBitcoindNode') and config.UpstreamBitcoindNode:
 		BitcoinLink(bcnode, dest=config.UpstreamBitcoindNode)
