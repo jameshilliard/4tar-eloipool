@@ -28,6 +28,8 @@ if not args.config is None:
 
 from bitcoin.script import BitcoinScript
 
+import logging
+
 config = None
 def loadConfig(confMod, init = False):
 	global config
@@ -50,14 +52,20 @@ def loadConfig(confMod, init = False):
 
 		config.TrackerAddr[0] = BitcoinScript.toAddress(config.TrackerAddr[0])
 
+		ctas = config.TrackerAddr[1]
+		ctas_del = []
+
 		config.PrivateMining = {}
-		for username in config.TrackerAddr[1]:
+		for username in ctas:
 			try:
-				addr = BitcoinScript.toAddress(config.TrackerAddr[1][username][0])
+				addr = BitcoinScript.toAddress(ctas[username][0])
 			except:
-				logging.getLogger("loadConfig").warning('Invalid addr: %s' % (config.TrackerAddr[1][username][0],))
+				ctas_del.append(username)
+				logging.getLogger("loadConfig").warning('Invalid addr: %s' % (ctas[username][0],))
 				continue
-			config.PrivateMining[username] = ( [ addr, config.TrackerAddr[1][username][1] ], b'', 0 )
+			config.PrivateMining[username] = ( [ addr, ctas[username][1] ], b'', 0 )
+		for name in ctas_del:
+			del ctas[name]
 
 		rl[0] = rl[1] = rl[2] = rl[3] = rl[4] = 1
 	else:
@@ -155,7 +163,6 @@ def loadConfig(confMod, init = False):
 
 loadConfig(configmod, True)
 
-import logging
 import logging.handlers
 
 rootlogger = logging.getLogger(None)
