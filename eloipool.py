@@ -303,8 +303,8 @@ def poolWorker(wl, ss):
 						if now > userwork[wli][1] + 120:
 							del userwork[wli]
 							pruned += 1
-				if pruned:
-					poolWorker.logger.info('Pruned %d of %d jobs' % (pruned, total))
+				#if pruned:
+				#	poolWorker.logger.info('Pruned %d of %d jobs' % (pruned, total))
 		except:
 			poolWorker.logger.error(traceback.format_exc())
 poolWorker.logger = logging.getLogger('poolWorker')
@@ -350,7 +350,7 @@ from merklemaker import assembleBlock
 if not hasattr(config, 'BlockSubmissions'):
 	config.BlockSubmissions = None
 
-RBFs = []
+#RBFs = []
 def blockSubmissionThread(payload, blkhash, share):
 	if config.BlockSubmissions is None:
 		servers = list(a for b in MM.TemplateSources for a in b)
@@ -369,7 +369,6 @@ def blockSubmissionThread(payload, blkhash, share):
 	payload = b2a_hex(payload).decode('ascii')
 	nexterr = 0
 	tries = 0
-	success = False
 	while len(servers):
 		tries += 1
 		TS = servers.pop(0)
@@ -384,7 +383,7 @@ def blockSubmissionThread(payload, blkhash, share):
 				RaiseRedFlags(traceback.format_exc())
 				nexterr = now + 5
 			if MM.currentBlock[0] not in myblock and tries > len(servers):
-				RBFs.append( (('next block', MM.currentBlock, now, gbterr), payload, blkhash, share) )
+				#RBFs.append( (('next block', MM.currentBlock, now, gbterr), payload, blkhash, share) )
 				RaiseRedFlags('Giving up on submitting block to upstream \'%s\'' % (TS['name'],))
 				if share['upstreamRejectReason'] is PendingUpstream:
 					share['upstreamRejectReason'] = 'GAVE UP'
@@ -399,15 +398,14 @@ def blockSubmissionThread(payload, blkhash, share):
 		if reason:
 			# FIXME: The returned value could be a list of multiple responses
 			msg = 'Upstream \'%s\' block submission failed: %s' % (TS['name'], reason,)
-			if success and reason in ('stale-prevblk', 'bad-prevblk', 'orphan', 'duplicate'):
+			if reason in ('stale-prevblk', 'bad-prevblk', 'orphan', 'duplicate'):
 				# no big deal
-				blockSubmissionThread.logger.debug(msg)
+				blockSubmissionThread.logger.info(msg)
 			else:
-				RBFs.append( (('upstream reject', reason, time()), payload, blkhash, share) )
+				#RBFs.append( (('upstream reject', reason, time()), payload, blkhash, share) )
 				RaiseRedFlags(msg)
 		else:
-			blockSubmissionThread.logger.debug('Upstream \'%s\' accepted block' % (TS['name'],))
-			success = True
+			blockSubmissionThread.logger.info('Upstream \'%s\' accepted block' % (TS['name'],))
 		if share['upstreamRejectReason'] is PendingUpstream:
 			share['upstreamRejectReason'] = reason
 			share['upstreamResult'] = not reason
@@ -530,10 +528,11 @@ def checkShare(share):
 		if not 'target' in share:
 			raise RejectedShare('stale-work')
 
-		while share['target'] < blkhashn:
+		while share['target'] < blkhashn and share['targetUp'] > 0:
 			share['target'] *= 2
-			if share['target'] > config.ShareTarget:
-				raise RejectedShare('high-hash')
+			share['targetUp'] -= 1
+		if share['target'] < blkhashn:
+			raise RejectedShare('high-hash')
 
 		shareTimestamp = unpack('<L', data[68:72])[0]
 		if shareTime < issueT - 120:

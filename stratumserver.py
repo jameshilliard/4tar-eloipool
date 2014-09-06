@@ -30,10 +30,10 @@ import traceback
 from util import RejectedShare, swap32, target2bdiff
 
 class StratumError(BaseException):
-	def __init__(self, errno, msg, tb = True):
-		self.StratumErrNo = errno
-		self.StratumErrMsg = msg
-		self.StratumTB = tb
+	def __init__(self, errno, msg, trace = False, extraMsg = None, disconnect = False):
+		self.error = (errno, msg, trace)
+		self.extraMsg = extraMsg
+		self.disconnect = disconnect
 
 StratumCodes = {
 	'unknown': 20,
@@ -57,8 +57,11 @@ class StratumHandler(networkserver.SocketHandler):
 		self.remoteHost = self.addr[0]
 		self.changeTask(None)
 		self.target = self.server.defaultTarget
+		# targetUp targetUpCount targetIncCount
+		self.targetUp = [ 0, 0, 8 ]
 		#self.server.schedule(self.sendLicenseNotice, time() + 4, errHandler=self)
 		self.set_terminator(b"\n")
+		self.submitError = 0
 		self.submitTimeCount = 0
 		self.lastSubmitTime = 0
 		self.lastSubmitJobId = 0
@@ -95,6 +98,7 @@ class StratumHandler(networkserver.SocketHandler):
 			except BaseException as e:
 				self.logger.debug(traceback.format_exc())
 			return
+
 		funcname = '_stratum_%s' % (rpc['method'].replace('.', '_'),)
 		if not hasattr(self, funcname):
 			self.sendReply({
@@ -108,10 +112,18 @@ class StratumHandler(networkserver.SocketHandler):
 			rv = getattr(self, funcname)(*rpc['params'])
 		except StratumError as e:
 			self.sendReply({
-				'error': (e.StratumErrNo, e.StratumErrMsg, traceback.format_exc() if e.StratumTB else None),
+				'error': (e.error[0], e.error[1], traceback.format_exc() if e.error[2] else None),
 				'id': rpc['id'],
 				'result': None,
 			})
+			if e.extraMsg:
+				self.sendReply({
+					'id': 8,
+					'method': 'client.show_message',
+					'params': (e.extraMsg,),
+				})
+			if e.disconnect:
+				self.boot()
 			return
 		except BaseException as e:
 			fexc = traceback.format_exc()
@@ -175,21 +187,25 @@ class StratumHandler(networkserver.SocketHandler):
 			self.JobTargets.popitem(False)
 		self.JobTargets[self.server.JobId] = self.target
 
-	def requestStratumUA(self):
-		self.sendReply({
-			'id': 7,
-			'method': 'client.get_version',
-			'params': (),
-		})
-
 	def _stratumreply_7(self, rpc):
 		self.UA = rpc.get('result') or rpc
+
+	def _stratum_mining_authorize(self, username, password = None):
+		self.UN = username
+		self.Authorized = True
+		if self.Subscribed:
+			self.changeTask(self.sendJob, 0)
+		return True
 
 	def _stratum_mining_subscribe(self, UA = None, xid = None):
 		if not UA is None:
 			self.UA = UA
 		if not self.UA:
-			self.requestStratumUA()
+			self.sendReply({
+				'id': 7,
+				'method': 'client.get_version',
+				'params': (),
+			})
 
 		if not hasattr(self, '_sid'):
 			self._sid = self.server.sidMgr.get()
@@ -226,13 +242,16 @@ class StratumHandler(networkserver.SocketHandler):
 
 	def _stratum_mining_submit(self, username, jobid, extranonce2, ntime, nonce):
 		#if username not in self.Usernames:
-		#	raise StratumError(24, 'unauthorized-user', False)
+		#	raise StratumError(24, 'unauthorized-user')
 		submitTime = time()
 		newBdiff = 0
+		targetUp = False
 		if self.server.MinSubmitInterval:
 			if submitTime - self.lastSubmitTime < self.server.MinSubmitInterval:
 				if self.submitTimeCount > 0:
 					if self.target != self.server.networkTarget:
+						targetUp = True
+
 						self.target /= 2
 						if self.target < self.server.networkTarget:
 							self.target = self.server.networkTarget
@@ -279,38 +298,51 @@ class StratumHandler(networkserver.SocketHandler):
 			'nonce': bytes.fromhex(nonce),
 			'height': self.server.Height,
 			'time': submitTime,
+			'targetUp': self.targetUp[0] if self.targetUp[1] else 0
 		}
 		if jobid in self.JobTargets:
 			share['target'] = self.JobTargets[jobid]
+
+		if self.targetUp[0] and self.targetUp[1]:
+			self.targetUp[1] -= 1
+			if not self.targetUp[1]:
+				self.targetUp[0] = 0
+
+		if newBdiff:
+			self.JobTargets[jobid] = self.target
+			if targetUp:
+				self.targetUp[0] += 1
+				self.targetUp[1] += self.targetUp[2]
+				if self.targetUp[2] > 1:
+					self.targetUp[2] = int(self.targetUp[2] / 2)
 
 		try:
 			self.server.receiveShare(share)
 		except RejectedShare as rej:
 			rej = str(rej)
 			errno = StratumCodes.get(rej, 20)
-			raise StratumError(errno, rej, False)
+			self.submitError += 1
+			if self.submitError < 10:
+				raise StratumError(errno, rej)
+			raise StratumError(errno, reg, False, 'Too many errors found in your submitted shares, disconnect now.', True)
 
-		if newBdiff:
-			self.JobTargets[jobid] = self.target
+		if self.targetUp[0]:
+			self.targetUp[0] -= share['targetUp']
 
-		return True
+		if self.submitError:
+			self.submitError -= 1
 
-	def _stratum_mining_authorize(self, username, password = None):
-		self.UN = username
-		self.Authorized = True
-		if self.Subscribed:
-			self.changeTask(self.sendJob, 0)
 		return True
 
 	def _stratum_mining_get_transactions(self, jobid):
 		if self.VPM:
-			raise StratumError(26, 'no-txlist-for-vpm', False)
+			raise StratumError(26, 'no-txlist-for-vpm')
 
 		jobid = int(jobid)
 		if jobid != self.server.JobId or jobid == self.lastSubmitJobId:
-			raise StratumError(26, 'stale-txlist-req', False)
+			raise StratumError(26, 'stale-txlist-req')
 		if self.lastGetTxnsJobId and jobid - self.lastGetTxnsJobId < self.server.GetTxnsInterval:
-			raise StratumError(26, 'too-frequent-txlist-req', False)
+			raise StratumError(26, 'too-frequent-txlist-req')
 
 		self.lastGetTxnsJobId = jobid
 
