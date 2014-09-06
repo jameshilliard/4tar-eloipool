@@ -24,7 +24,7 @@ import logging
 import networkserver
 import socket
 import struct
-from time import time
+from time import time, sleep
 from math import ceil
 import traceback
 from util import RejectedShare, swap32, target2bdiff
@@ -378,7 +378,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		super().__init__(*a, **ka)
 
 		self._Clients = {}
-		self.JobId = -1
+		self.RestartJobId = self.JobId = -1
 		self.Height = 0
 		self.UpdateTask = None
 		self.networkTarget = None
@@ -395,7 +395,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 
 	def updateJobOnly(self, wantClear = False):
 		JobId = self.JobId + 1 if self.JobId < 999 else 0
-		(MC, now) = self.getStratumJob(JobId, wantClear=wantClear)
+		(MC, now) = self.getStratumJob(JobId, wantClear = wantClear)
 		(height, merkleTree, cb, prevBlock, bits) = MC[:5]
 
 		if len(cb) > 96 - len(self.extranonce1null) - 4:
@@ -508,12 +508,14 @@ class StratumServer(networkserver.AsyncSocketServer):
 			self.RestartClientJobEvent.clear()
 
 			if self.keepgoing:
-				C = self._Clients
-				if not C:
+				Clients = self._Clients
+				if not Clients:
 					continue
 
-				OC = len(C)
-				self.logger.info("%d clients to wake up..." % (OC,))
+				RestartJobId = self.RestartJobId
+
+				count = len(Clients)
+				self.logger.info("%d clients to wake up..." % (count,))
 
 				now = time()
 
@@ -523,17 +525,24 @@ class StratumServer(networkserver.AsyncSocketServer):
 				# However, current implementation of cgminer/bfgminer would switch to the new job
 				# no matter it is asking for a restart or not, so it should be just fine.
 				# If any problem related to restarting request found, we should check the possiblity.
-				for ic in list(C.values()):
-					try:
-						ic.sendJob()
-					except socket.error:
-						OC -= 1
-						# Ignore socket errors; let the main event loop take care of them later
-					except:
-						OC -= 1
-						self.logger.warning('Error sending new job:\n' + traceback.format_exc())
+				for i in (0, 1):
+					for client in list(Clients.values()):
+						try:
+							client.sendJob()
+						except socket.error:
+							count -= 1
+							# Ignore socket errors; let the main event loop take care of them later
+						except:
+							count -= 1
+							self.logger.warning('Error sending new job:\n' + traceback.format_exc())
 
-				self.logger.info('Restart job sent to %d clients in %.3f seconds' % (OC, time() - now))
+					if RestartJobId == -1:
+						break
+
+					while i == 0 and self.JobId == RestartJobId:
+						sleep(0.1)
+
+				self.logger.info('Restart job sent to %d clients in %.3f seconds' % (count, time() - now))
 
 	def updateJob(self, wantClear = False, networkTarget = None, refreshVPM = False):
 		if self.UpdateTask:
@@ -551,6 +560,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 				self.restartApp(True, True)
 				return
 
+			self.RestartJobId = self.JobId if wantClear else -1
 			self.RestartClientJobEvent.set()
 
 		self.UpdateTask = self.schedule(self.updateJob, self.jobUpdateTime + 55)
