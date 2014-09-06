@@ -324,7 +324,7 @@ class StratumHandler(networkserver.SocketHandler):
 			self.submitError += 1
 			if self.submitError < 10:
 				raise StratumError(errno, rej)
-			raise StratumError(errno, reg, False, 'Too many errors found in your submitted shares, disconnect now.', True)
+			raise StratumError(errno, rej, False, 'Too many errors found in your submitted shares, disconnect now.', True)
 
 		if self.targetUp[0]:
 			self.targetUp[0] -= share['targetUp']
