@@ -503,13 +503,15 @@ class StratumServer(networkserver.AsyncSocketServer):
 	def _RestartClientJob(self):
 		while self.keepgoing:
 			self.RestartClientJobEvent.wait()
-			if self.keepgoing and self.RestartClientJobEvent.is_set():
+			self.RestartClientJobEvent.clear()
+
+			if self.keepgoing:
 				C = self._Clients
 				if not C:
-					self.logger.debug('Nobody to wake up')
-					return
+					continue
+
 				OC = len(C)
-				self.logger.debug("%d clients to wake up..." % (OC,))
+				self.logger.info("%d clients to wake up..." % (OC,))
 
 				now = time()
 
@@ -527,9 +529,9 @@ class StratumServer(networkserver.AsyncSocketServer):
 						# Ignore socket errors; let the main event loop take care of them later
 					except:
 						OC -= 1
-						self.logger.debug('Error sending new job:\n' + traceback.format_exc())
+						self.logger.warning('Error sending new job:\n' + traceback.format_exc())
 
-				self.logger.debug('Restart job sent to %d clients in %.3f seconds' % (OC, time() - now))
+				self.logger.info('Restart job sent to %d clients in %.3f seconds' % (OC, time() - now))
 
 	def updateJob(self, wantClear = False, networkTarget = None, refreshVPM = False):
 		if self.UpdateTask:
