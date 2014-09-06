@@ -152,7 +152,9 @@ MinimumTemplateScore = 1
 DelayLogForUpstream = False
 
 # Bitcoin p2p server for announcing blocks found
-UpstreamBitcoindNode = ('127.0.0.1', 18333)  # testnet
+UpstreamBitcoindNode = [
+	('127.0.0.1', 8333, True),
+]
 
 # Network ID for the primary blockchain
 # Other known network IDs can be found at:

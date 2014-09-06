@@ -39,24 +39,29 @@ class BitcoinLink(networkserver.SocketHandler):
 
 	def __init__(self, *a, **ka):
 		dest = ka.pop('dest', None)
-		if dest:
-			# Initiate outbound connection
-			try:
-				if ':' not in dest[0]:
-					dest = ('::ffff:' + dest[0],) + tuple(x for x in dest[1:])
-			except:
-				pass
-			sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-			sock.connect(dest)
-			ka['sock'] = sock
-			ka['addr'] = dest
+		if not dest:
+			raise ValueError('No destination for BitcoinLink initialization')
+
+		self.TS = dest[-1]
+		dest = tuple(x for x in dest[:-1])
+
+		# Initiate outbound connection
+		try:
+			if ':' not in dest[0]:
+				dest = ('::ffff:' + dest[0],) + tuple(x for x in dest[1:])
+		except:
+			pass
+		sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+		sock.connect(dest)
+		ka['sock'] = sock
+		ka['addr'] = dest
 		ka['auto_reconn'] = True
 		super().__init__(*a, **ka)
-		self.dest = dest
+
+		#self.dest = dest
 		self.changeTask(None)  # FIXME: TEMPORARY
-		if dest:
-			self._OnConnected = self.OnConnected
-			self._OnConnected()
+		self._OnConnected = self.OnConnected
+		self._OnConnected()
 
 	def handle_readbuf(self):
 		netid = self.server.netid
@@ -132,8 +137,8 @@ class BitcoinLink(networkserver.SocketHandler):
 				getattr(self, method)(invHash)
 
 	def doInv_2(self, blkhash):  # MSG_BLOCK
-		self.logger.debug('Received block inv from %s for %s' % (self.addr, b2a_hex(blkhash[::-1]).decode('ascii'),))
-		self.server.receiveNewBlock(blkhash)
+		self.logger.info('Received inv %s from %s' % (b2a_hex(blkhash[::-1]).decode('ascii'), self.addr))
+		self.server.receiveNewBlock(blkhash, self.TS)
 
 	def doCmd_version(self, payload):
 		# FIXME: check for loopbacks
@@ -183,10 +188,13 @@ class BitcoinNode(networkserver.AsyncSocketServer):
 		self._om.append(self.makeMessage('block', payload))
 		self.wakeup()
 
-	def receiveNewBlock(self, blkhash):
+	def receiveNewBlock(self, blkhash, TS):
 		if self.nblkhash != blkhash:
-			self.newBlock(blkhash)
-			self.nblkhash = blkhash
+			if TS:
+				self.nblkhash = blkhash
+				self.newBlock(blkhash)
+			else:
+				self.logger.warning('NonTS got new inv first')
 
 	def newBlock(self, blkhash):
 		pass
