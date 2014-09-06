@@ -811,9 +811,11 @@ if __name__ == "__main__":
 	stratumsrv.IsJobValid = IsJobValid
 	stratumsrv.restartApp = exitApp
 	if hasattr(config, 'SessionIdRange'):
-		stratumsrv.sidMgr = UniqueIdManager(config.SessionIdRange[0], config.SessionIdRange[1])
+		#stratumsrv.sidMgr = UniqueIdManager(config.SessionIdRange[0], config.SessionIdRange[1])
+		stratumsrv.SessionIdRange = config.SessionIdRange
 	else:
-		stratumsrv.sidMgr = UniqueIdManager()
+		#stratumsrv.sidMgr = UniqueIdManager()
+		stratumsrv.SessionIdRange = (0, 0xFFFF)
 	#stratumsrv.checkAuthentication = checkAuthentication
 	if not hasattr(config, 'StratumAddresses'):
 		config.StratumAddresses = ()

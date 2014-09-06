@@ -211,10 +211,8 @@ class StratumHandler(networkserver.SocketHandler):
 			})
 
 		if not hasattr(self, '_sid'):
-			self._sid = self.server.sidMgr.get()
-		if self.server._Clients.get(self._sid) not in (self, None):
-			del self._sid
-			raise self.server.RaiseRedFlags(RuntimeError('issuing duplicate sessionid'))
+			#self._sid = self.server.sidMgr.get()
+			self._sid = self.server.getSessionId(self)
 
 		self.Subscribed = True
 		if self.Authorized:
@@ -235,7 +233,7 @@ class StratumHandler(networkserver.SocketHandler):
 
 	def close(self):
 		if hasattr(self, '_sid'):
-			self.server.sidMgr.put(self._sid)
+			#self.server.sidMgr.put(self._sid)
 			delattr(self, '_sid')
 		try:
 			del self.server._Clients[id(self)]
@@ -387,7 +385,6 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.GetTxnsInterval = 0
 		self.jobUpdateTime = self.lastSubmitTime = time()
 		self.PrivateMining = {}
-		#self.sidMgr = UniqueIdManager()
 		self.RestartClientJobEvent = threading.Event()
 		threading.Thread(target = self._RestartClientJob).start() 
 
@@ -555,3 +552,11 @@ class StratumServer(networkserver.AsyncSocketServer):
 			self.RestartClientJobEvent.set()
 
 		self.UpdateTask = self.schedule(self.updateJob, self.jobUpdateTime + 55)
+
+	def getSessionId(self, client):
+		sid = self.SessionIdRange[0] + client.fd
+		if sid > self.SessionIdRange[1]:
+			raise self.RaiseRedFlags(RuntimeError('sessionid %08x out of range' % sid))
+		#if self._Clients.get(sid) not in (client, None):
+		#	raise self.RaiseRedFlags(RuntimeError('issuing duplicate sessionid %08x' % sid))
+		return sid
