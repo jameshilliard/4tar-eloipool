@@ -267,7 +267,7 @@ class StratumHandler(networkserver.SocketHandler):
 				self.submitTimeCount = 0
 		if not newBdiff and self.server.MaxSubmitInterval:
 			if submitTime - self.lastSubmitTime > self.server.MaxSubmitInterval:
-				if self.submitTimeCount < 0:
+				if self.submitTimeCount < -1:
 					if self.target != self.server.defaultTarget:
 						self.target *= 2
 						if self.target > self.server.defaultTarget:
@@ -276,7 +276,7 @@ class StratumHandler(networkserver.SocketHandler):
 						self.logger.debug("Decrease difficulty to %s for %d/%s@%s" % (newBdiff, self._sid, username, str(self.addr)))
 					self.submitTimeCount = 0
 				else:
-					self.submitTimeCount = -1
+					self.submitTimeCount -= 1
 			elif self.submitTimeCount < 0:
 				self.submitTimeCount = 0
 		if newBdiff:
