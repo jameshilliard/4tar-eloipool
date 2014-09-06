@@ -72,7 +72,14 @@ class StratumHandler(networkserver.SocketHandler):
 		#self.LicenseSent = agplcompliance._SourceFiles is None
 
 	def sendReply(self, ob):
-		return self.push(json.dumps(ob).encode('ascii') + b"\n")
+		self.push(json.dumps(ob).encode('ascii') + b"\n")
+
+	def sendMessage(self, msg):
+		self.sendReply({
+			'id': 8,
+			'method': 'client.show_message',
+			'params': (msg,),
+		})
 
 	def found_terminator(self):
 		inbuf = b"".join(self.incoming).decode('ascii')
@@ -117,11 +124,7 @@ class StratumHandler(networkserver.SocketHandler):
 				'result': None,
 			})
 			if e.extraMsg:
-				self.sendReply({
-					'id': 8,
-					'method': 'client.show_message',
-					'params': (e.extraMsg,),
-				})
+				self.sendMessage(e.extraMsg)
 			if e.disconnect:
 				self.boot()
 			return
@@ -149,18 +152,21 @@ class StratumHandler(networkserver.SocketHandler):
 #		if self.fd == -1:
 #			return
 #		if not self.LicenseSent:
-#			self.sendReply({
-#				'id': 8,
-#				'method': 'client.show_message',
-#				'params': ('This stratum server is licensed under the GNU Affero General Public License, version 3. You may download source code over stratum using the server.get_source method.',),
-#			})
+#			self.sendMessage("We're using the GNU AGPL v3. Source code can be downloaded via server.get_source method.")
 #		self.LicenseSent = True
 
 	def sendJob(self):
 		if self.server.JobId in self.JobTargets:
 			return
 
-		if not len(self.JobTargets):
+		if len(self.JobTargets) > 4:
+			if self.lastSubmitTime + 600 < self.server.jobUpdateTime:
+				self.sendMessage('Long time no submission, disconnect now.')
+				self.boot()
+				return
+
+			self.JobTargets.popitem(False)
+		elif not len(self.JobTargets):
 			diff = target2bdiff(self.target)
 			self.logger.debug("Initialize difficulty to %s for %d/%s@%s" % (diff, self._sid, self.UN, str(self.addr)))
 			self.sendReply({
@@ -168,6 +174,7 @@ class StratumHandler(networkserver.SocketHandler):
 				'method': 'mining.set_difficulty',
 				'params': [ diff ],
 			})
+		self.JobTargets[self.server.JobId] = self.target
 
 		#self.logger.debug("sendJob to %s@%s" % (self.UN, str(self.addr)))
 
@@ -182,10 +189,6 @@ class StratumHandler(networkserver.SocketHandler):
 				self.push(self.server.JobBytesRestart)
 			else:
 				self.push(self.server.JobBytes)
-
-		if len(self.JobTargets) > 4:
-			self.JobTargets.popitem(False)
-		self.JobTargets[self.server.JobId] = self.target
 
 	def _stratumreply_7(self, rpc):
 		self.UA = rpc.get('result') or rpc
@@ -324,7 +327,7 @@ class StratumHandler(networkserver.SocketHandler):
 			self.submitError += 1
 			if self.submitError < 10:
 				raise StratumError(errno, rej)
-			raise StratumError(errno, rej, False, 'Too many errors found in your submitted shares, disconnect now.', True)
+			raise StratumError(errno, rej, False, 'Too many errors found in your submission, disconnect now.', True)
 
 		if self.targetUp[0]:
 			self.targetUp[0] -= share['targetUp']
@@ -382,7 +385,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.MinSubmitInterval = 0
 		self.MaxSubmitInterval = 0
 		self.GetTxnsInterval = 0
-		self.lastSubmitTime = time()
+		self.jobUpdateTime = self.lastSubmitTime = time()
 		self.PrivateMining = {}
 		#self.sidMgr = UniqueIdManager()
 		self.RestartClientJobEvent = threading.Event()
@@ -543,12 +546,12 @@ class StratumServer(networkserver.AsyncSocketServer):
 		if networkTarget:
 			self.networkTarget = networkTarget
 
-		now = self.updateJobOnly(wantClear = wantClear)
+		self.jobUpdateTime = self.updateJobOnly(wantClear = wantClear)
 		if wantClear or refreshVPM:
-			if now - self.lastSubmitTime > self.RestartInterval:
+			if self.jobUpdateTime - self.lastSubmitTime > self.RestartInterval:
 				self.restartApp(True, True)
 				return
 
 			self.RestartClientJobEvent.set()
 
-		self.UpdateTask = self.schedule(self.updateJob, now + 55)
+		self.UpdateTask = self.schedule(self.updateJob, self.jobUpdateTime + 55)

@@ -210,7 +210,7 @@ class SocketHandler:
 			#self.logger.info("sock %d: %s disconnected, let's see what will happen" % (self.fd, self.addr))
 			self.logger.info("sock %d: %s disconnected, re-connecting now" % (self.fd, self.addr))
 
-			reconn_thr = threading.Thread(target=self.reconnHandler)
+			reconn_thr = threading.Thread(target = self.reconnHandler)
 			reconn_thr.daemon = True
 			reconn_thr.start()
 			return
