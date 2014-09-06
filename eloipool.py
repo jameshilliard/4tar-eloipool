@@ -52,7 +52,11 @@ def loadConfig(confMod, init = False):
 
 		config.PrivateMining = {}
 		for username in config.TrackerAddr[1]:
-			addr = BitcoinScript.toAddress(config.TrackerAddr[1][username][0])
+			try:
+				addr = BitcoinScript.toAddress(config.TrackerAddr[1][username][0])
+			except:
+				logging.getLogger("loadConfig").warning('Invalid addr: %s' % (config.TrackerAddr[1][username][0],))
+				continue
 			config.PrivateMining[username] = ( [ addr, config.TrackerAddr[1][username][1] ], b'', 0 )
 
 		rl[0] = rl[1] = rl[2] = rl[3] = rl[4] = 1
@@ -116,10 +120,19 @@ def loadConfig(confMod, init = False):
 							if name and len(addr) > 30:
 								#logging.getLogger("loadConfig").debug('VPM addr: %s - %s' % (name, addr))
 								tas.append(name)
-								if name not in ctas or ctas[name][0] != addr or ctas[name][1] != perc:
-									taStep = 3
-									ctas[name] = [ addr, perc ]
-									cpms[name] = ( [ BitcoinScript.toAddress(addr), perc ], b'', 1 )
+								if name not in ctas or ctas[name][0] != addr:
+									try:
+										cpms[name] = ( [ BitcoinScript.toAddress(addr), perc ], b'', 1 )
+									except:
+										del tas[name]
+										logging.getLogger("loadConfig").warning('Invalid addr: %s' % (addr,))
+										continue
+								elif ctas[name][1] != perc:
+									cpms[name] = ( [ cpms[name][0][0], perc ], b'', 1 )
+								else:
+									continue
+								ctas[name] = [ addr, perc ]
+								taStep = 3
 
 					if r == 6:
 						break
