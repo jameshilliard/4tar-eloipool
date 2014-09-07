@@ -24,6 +24,7 @@ import logging
 import networkserver
 import socket
 import struct
+import re
 from time import time, sleep
 from math import ceil
 import traceback
@@ -170,7 +171,7 @@ class StratumHandler(networkserver.SocketHandler):
 			self.JobTargets.popitem(False)
 		elif not len(self.JobTargets):
 			diff = target2bdiff(self.target)
-			self.logger.debug("Initialize difficulty to %s for %d/%s@%s" % (diff, self._sid, self.UN, str(self.addr)))
+			self.logger.debug("Initialize difficulty to %s for %d/%s@%s" % (diff, self._sid, self.UN[0], str(self.addr)))
 			self.sendReply({
 				'id': None,
 				'method': 'mining.set_difficulty',
@@ -178,9 +179,9 @@ class StratumHandler(networkserver.SocketHandler):
 			})
 		self.JobTargets[self.server.JobId] = self.target
 
-		#self.logger.debug("sendJob to %s@%s" % (self.UN, str(self.addr)))
+		#self.logger.debug("sendJob to %s@%s" % (self.UN[0], str(self.addr)))
 
-		userName = self.UN.split('.')[0]
+		userName = self.UN[1]
 		if userName in self.server.PrivateMining:
 			if self.server.PrivateMining[userName][1]:
 				self.VPM = True
@@ -196,10 +197,16 @@ class StratumHandler(networkserver.SocketHandler):
 		self.UA = rpc.get('result') or rpc
 
 	def _stratum_mining_authorize(self, username, password = None):
-		self.UN = username
+		self.UN = (username, username.split('.')[0])
+		if not self.UN[1]:
+			self.sendMessage("Miner name should have user name as its prefix, separated with '.', e.g. user.%s" % username[1:])
+		if self.UN[1] != username and self.server.reUN.search(username[len(self.UN[1])+1:]):
+			self.sendMessage('Miner name can only include alphanumber, e.g. %s.miner007' % self.UN[1])
+
 		self.Authorized = True
 		if self.Subscribed:
 			self.changeTask(self.sendJob, 0)
+
 		return True
 
 	def _stratum_mining_subscribe(self, UA = None, xid = None):
@@ -378,6 +385,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		super().__init__(*a, **ka)
 
 		self._Clients = {}
+		self.reUN = re.compile('[^a-zA-Z0-9]')
 		self.RestartJobId = self.JobId = -1
 		self.Height = 0
 		self.UpdateTask = None
