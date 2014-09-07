@@ -195,7 +195,7 @@ class merkleMaker(threading.Thread):
 
 		if _HBH is None:
 			_HBH = (b2a_hex(newBlock[::-1]).decode('utf8'), b2a_hex(bits[::-1]).decode('utf8'))
-		self.logger.info('New block: %s (height: %d; bits: %s)' % (_HBH[0], height, _HBH[1]))
+		self.logger.info('New block: %s (height: %d; bits: %s)' % (_HBH[0], height - 1, _HBH[1]))
 		self.currentBlock = (newBlock, height, bits)
 
 		if lastHeight != height:
