@@ -31,10 +31,31 @@ from bitcoin.script import BitcoinScript
 import logging
 
 config = None
+dynConfigItems = [
+	( 'DefaultShareTarget', 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff ),
+	( 'MinSubmitInterval', 10 ),
+	( 'MaxSubmitInterval', 40 ),
+	( 'GetTxnsInterval', 10 ),
+	( 'RestartInterval', 601 ),
+]
+
+def getConfigValue(strVal):
+	strVal = strVal.strip()
+	if strVal[0:2] == '0x':
+		return int(strVal, 16)
+	elif strVal == 'True':
+		return True
+	elif strVal == 'False':
+		return False
+	else:
+		return int(strVal)
+
 def loadConfig(confMod, init = False):
 	global config
 
-	rl = [ 0, 0, 0, 0, 0 ]
+	vpmUpdated = False
+
+	rl = list(0 for i in range(0, len(dynConfigItems)))
 
 	if init:
 		__import__(confMod)
@@ -42,13 +63,10 @@ def loadConfig(confMod, init = False):
 
 		if not hasattr(config, 'ServerName'):
 			config.ServerName = '37pool.com'
-		#gotwork = None
-		#if hasattr(config, 'GotWorkURI'):
-		#	gotwork = jsonrpc.ServiceProxy(config.GotWorkURI)
-		#if not hasattr(config, 'GotWorkTarget'):
-		#	config.GotWorkTarget = 0
 		if not hasattr(config, 'DelayLogForUpstream'):
 			config.DelayLogForUpstream = False
+
+		rl = list(map(lambda x: 1, rl))
 
 		config.TrackerAddr[0] = BitcoinScript.toAddress(config.TrackerAddr[0])
 
@@ -66,39 +84,28 @@ def loadConfig(confMod, init = False):
 			config.PrivateMining[username] = ( [ addr, ctas[username][1] ], b'', 0 )
 		for name in ctas_del:
 			del ctas[name]
-
-		rl[0] = rl[1] = rl[2] = rl[3] = rl[4] = 1
 	else:
 		r = 0
 
+		taStep = 0
+		tas = []
+
 		conf = open(confMod + ".py", 'r')
 		try:
-			taStep = 0
-			tas = []
 			for line in conf:
 				a = line.split('=')
 				if len(a) == 2 or taStep:
 					a[0] = a[0].strip()
-					if a[0] == "ShareTarget":
-						r += 1
-						rl[0] = 1
-						config.ShareTarget = int(a[1].strip(), 16)
-					elif a[0] == "MinSubmitInterval":
-						r += 1
-						rl[1] = 1
-						config.MinSubmitInterval = int(a[1].strip())
-					elif a[0] == "MaxSubmitInterval":
-						r += 1
-						rl[2] = 1
-						config.MaxSubmitInterval = int(a[1].strip())
-					elif a[0] == "GetTxnsInterval":
-						r += 1
-						rl[3] = 1
-						config.GetTxnsInterval = int(a[1].strip())
-					elif a[0] == "RestartInterval":
-						r += 1
-						rl[4] = 1
-						config.RestartInterval = int(a[1].strip())
+
+					oldr = r
+					for i in range(0, len(dynConfigItems)):
+						if a[0] == dynConfigItems[i][0]:
+							r += 1
+							rl[i] = 1
+							setattr(config, a[0], getConfigValue(a[1]))
+							break
+					if oldr < r:
+						pass
 					elif a[0] == 'TrackerAddr':
 						taStep = 1
 					elif taStep == 1 and a[0] == '{':
@@ -117,6 +124,7 @@ def loadConfig(confMod, init = False):
 								#logging.getLogger("loadConfig").debug('Clear VPM addr: %s' % (name,))
 								del ctas[name], cpms[name]
 							if taStep > 2:
+								vpmUpdated = True
 								stratumsrv.updateJob(refreshVPM = True)
 							taStep = 0
 						elif a[0][0] != '#':
@@ -142,25 +150,19 @@ def loadConfig(confMod, init = False):
 								ctas[name] = [ addr, perc ]
 								taStep = 3
 
-					if r == 6:
+					if r > len(dynConfigItems):
 						break
 		finally:
 			conf.close()
 
-		if r == 6:
-			return
+		if r > len(dynConfigItems):
+			return vpmUpdated
 
-	if not rl[0] or not hasattr(config, 'ShareTarget'):
-		config.ShareTarget = 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-	if not rl[1] or not hasattr(config, 'MinSubmitInterval'):
-		config.MinSubmitInterval = 3
-	if not rl[2] or not hasattr(config, 'MaxSubmitInterval'):
-		config.MaxSubmitInterval = 100
-	if not rl[3] or not hasattr(config, 'GetTxnsInterval'):
-		config.GetTxnsInterval = 10
-	if not rl[4] or not hasattr(config, 'RestartInterval'):
-		config.RestartInterval = 601
+	for i in range(0, len(dynConfigItems)):
+		if not rl[i] or not hasattr(config, dynConfigItems[i][0]):
+			setattr(config, dynConfigItems[i][0], dynConfigItems[i][1])
 
+	return vpmUpdated
 loadConfig(configmod, True)
 
 import logging.handlers
@@ -290,25 +292,21 @@ def poolWorker(wl, ss):
 #				i, config.MinSubmitInterval, config.MaxSubmitInterval, config.GetTxnsInterval,
 #				ss.MinSubmitInterval, ss.MaxSubmitInterval, ss.GetTxnsInterval))
 
-			refreshConf = ""
-			loadConfig(configmod)
-			if ss.defaultTarget != config.ShareTarget:
-				refreshConf = "defaultTarget"
-				ss.defaultTarget = config.ShareTarget
-			if ss.MinSubmitInterval != config.MinSubmitInterval:
-				refreshConf += (", " if refreshConf else "") + "MinSubmitInterval"
-				ss.MinSubmitInterval = config.MinSubmitInterval
-			if ss.MaxSubmitInterval != config.MaxSubmitInterval:
-				refreshConf += (", " if refreshConf else "") + "MaxSubmitInterval"
-				ss.MaxSubmitInterval = config.MaxSubmitInterval
-			if ss.GetTxnsInterval != config.GetTxnsInterval:
-				refreshConf += (", " if refreshConf else "") + "GetTxnsInterval"
-				ss.GetTxnsInterval = config.GetTxnsInterval
-			if ss.RestartInterval != config.RestartInterval:
-				refreshConf += (", " if refreshConf else "") + "RestartInterval"
-				ss.RestartInterval = config.RestartInterval
-			if refreshConf:
-				poolWorker.logger.info('Refresh config item %s' % (refreshConf,))
+			vpmUpdated = loadConfig(configmod)
+
+			refreshItems = ''
+			for i in range(0, len(dynConfigItems)):
+				sv = getattr(ss, dynConfigItems[i][0])
+				cv = getattr(config, dynConfigItems[i][0])
+				if sv != cv:
+					refreshItems += (', ' if refreshItems else '') + '%s (%s -> %s)' % (dynConfigItems[i][0], sv, cv)
+					setattr(ss, dynConfigItems[i][0], cv)
+
+			if vpmUpdated:
+				refreshItems += (', ' if refreshItems else '') + 'VPM Config'
+
+			if refreshItems:
+				poolWorker.logger.info('Refresh config item %s' % (refreshItems,))
 
 			i += 1
 			if i == 12:
@@ -507,7 +505,7 @@ def checkShare(share):
 
 	blkhash = dblsha(data)
 	blkhashn = LEhash2int(blkhash)
-	if blkhashn > config.ShareTarget:
+	if blkhashn > config.DefaultShareTarget:
 		raise RejectedShare('H-not-zero')
 
 	global networkTarget
@@ -578,7 +576,7 @@ def logShare(share):
 	#else:
 	#	share['solution'] = 0
 	#share['height'] = share['height']
-	share['diff'] = target2bdiff(share['target'] if 'target' in share else config.ShareTarget)
+	share['diff'] = target2bdiff(share['target'] if 'target' in share else config.DefaultShareTarget)
 	for i in shareLoggers:
 		i.logShare(share)
 
@@ -817,11 +815,8 @@ if __name__ == "__main__":
 			BitcoinLink(bcnode, dest = dest)
 
 	stratumsrv = StratumServer()
-	stratumsrv.defaultTarget = config.ShareTarget
-	stratumsrv.MinSubmitInterval = config.MinSubmitInterval
-	stratumsrv.MaxSubmitInterval = config.MaxSubmitInterval
-	stratumsrv.GetTxnsInterval = config.GetTxnsInterval
-	stratumsrv.RestartInterval = config.RestartInterval
+	for item in dynConfigItems:
+		setattr(stratumsrv, item[0], getattr(config, item[0]))
 	stratumsrv.PrivateMining = config.PrivateMining
 	stratumsrv.getStratumJob = getStratumJob
 	stratumsrv.getExistingStratumJob = getExistingStratumJob

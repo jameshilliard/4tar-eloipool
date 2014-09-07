@@ -19,7 +19,7 @@ ServerName = 'Private Eloipool'
 
 # Share hashes must be below this to be valid shares
 # If dynamic targetting is enabled, this is a minimum
-ShareTarget = 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+DefaultShareTarget = 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 # Automatically adjust targets per connection
 # 0 = disabled

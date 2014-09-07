@@ -58,7 +58,7 @@ class StratumHandler(networkserver.SocketHandler):
 		if self.remoteHost[0:7] == '::ffff:':
 			self.remoteHost = self.remoteHost[7:]
 		self.changeTask(None)
-		self.target = self.server.defaultTarget
+		self.target = self.server.DefaultShareTarget
 		# targetUp targetUpCount targetIncCount
 		self.targetUp = [ 0, 0, 8 ]
 		#self.server.schedule(self.sendLicenseNotice, time() + 4, errHandler=self)
@@ -268,10 +268,10 @@ class StratumHandler(networkserver.SocketHandler):
 		if not newBdiff and self.server.MaxSubmitInterval:
 			if submitTime - self.lastSubmitTime > self.server.MaxSubmitInterval:
 				if self.submitTimeCount < -1:
-					if self.target != self.server.defaultTarget:
+					if self.target != self.server.DefaultShareTarget:
 						self.target *= 2
-						if self.target > self.server.defaultTarget:
-							self.target = self.server.defaultTarget
+						if self.target > self.server.DefaultShareTarget:
+							self.target = self.server.DefaultShareTarget
 						newBdiff = target2bdiff(self.target)
 						self.logger.debug("Decrease difficulty to %s for %d/%s@%s" % (newBdiff, self._sid, username, str(self.addr)))
 					self.submitTimeCount = 0
@@ -540,7 +540,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 						break
 
 					while i == 0 and self.JobId == RestartJobId:
-						sleep(0.1)
+						sleep(0.03)
 
 				self.logger.info('Restart job sent to %d clients in %.3f seconds' % (count, time() - now))
 
