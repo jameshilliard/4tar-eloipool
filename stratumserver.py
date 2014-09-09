@@ -386,17 +386,18 @@ class StratumServer(networkserver.AsyncSocketServer):
 
 		self._Clients = {}
 		self.reUN = re.compile('[^a-zA-Z0-9]')
-		self.RestartJobId = self.JobId = -1
+		self.NotifyJobId = self.JobId = -1
 		self.Height = 0
 		self.UpdateTask = None
 		self.networkTarget = None
 		self.MinSubmitInterval = 0
 		self.MaxSubmitInterval = 0
 		self.GetTxnsInterval = 0
+		self.NotifyAllJobs = False
 		self.jobUpdateTime = self.lastSubmitTime = time()
 		self.PrivateMining = {}
-		self.RestartClientJobEvent = threading.Event()
-		threading.Thread(target = self._RestartClientJob).start() 
+		self.JobNotifyEvent = threading.Event()
+		threading.Thread(target = self._NotifyClientJob).start() 
 
 	def checkAuthentication(self, username, password):
 		return True
@@ -510,47 +511,50 @@ class StratumServer(networkserver.AsyncSocketServer):
 
 		return now
 
-	def _RestartClientJob(self):
+	def _NotifyClientJob(self):
 		while self.keepgoing:
-			self.RestartClientJobEvent.wait()
-			self.RestartClientJobEvent.clear()
+			self.JobNotifyEvent.wait()
+			self.JobNotifyEvent.clear()
 
-			if self.keepgoing:
-				Clients = self._Clients
-				if not Clients:
-					continue
+			if not self.keepgoing:
+				return
 
-				RestartJobId = self.RestartJobId
+			Clients = self._Clients
+			if not Clients:
+				continue
 
-				count = len(Clients)
-				self.logger.info("%d clients to wake up..." % (count,))
+			NotifyJobId = self.NotifyJobId
 
-				now = time()
+			count = len(Clients)
+			self.logger.info("%d clients to notify job update..." % (count,))
 
-				# There is a possibility that in the below loop, the updateJob() has updated the
-				# current job to a non-restart-one, that may cause all after-changing clients not
-				# to get a restart notifcation.
-				# However, current implementation of cgminer/bfgminer would switch to the new job
-				# no matter it is asking for a restart or not, so it should be just fine.
-				# If any problem related to restarting request found, we should check the possiblity.
-				for i in (0, 1):
-					for client in list(Clients.values()):
-						try:
-							client.sendJob()
-						except socket.error:
-							count -= 1
-							# Ignore socket errors; let the main event loop take care of them later
-						except:
-							count -= 1
-							self.logger.warning('Error sending new job:\n' + traceback.format_exc())
+			now = time()
 
-					if RestartJobId == -1:
-						break
+			# There is a possibility that in the below loop, the updateJob() has updated a
+			# current restart job to a non-restart-one, that may cause all after-changing
+			# clients not to get a restart notifcation.
+			# However, current implementation of cgminer/bfgminer would switch to the new
+			# job no matter it is asking for a restart or not, so it should be just fine.
+			#
+			# Should any problem related to restarting request found, check the possiblity.
+			for i in (0, 1):
+				for client in list(Clients.values()):
+					try:
+						client.sendJob()
+					except socket.error:
+						count -= 1
+						# Ignore socket errors; let the main event loop take care of them later
+					except:
+						count -= 1
+						self.logger.warning('Error sending new job:\n' + traceback.format_exc())
 
-					while i == 0 and self.JobId == RestartJobId:
-						sleep(0.03)
+				if NotifyJobId == -1:
+					break
 
-				self.logger.info('Restart job sent to %d clients in %.3f seconds' % (count, time() - now))
+				while i == 0 and self.JobId == NotifyJobId:
+					sleep(0.03)
+
+			self.logger.info('Job notification sent to %d clients in %.3f seconds' % (count, time() - now))
 
 	def updateJob(self, wantClear = False, networkTarget = None, refreshVPM = False):
 		if self.UpdateTask:
@@ -563,13 +567,13 @@ class StratumServer(networkserver.AsyncSocketServer):
 			self.networkTarget = networkTarget
 
 		self.jobUpdateTime = self.updateJobOnly(wantClear = wantClear)
-		if wantClear or refreshVPM:
-			if self.jobUpdateTime - self.lastSubmitTime > self.RestartInterval:
-				self.restartApp(True, True)
-				return
+		if self.jobUpdateTime - self.lastSubmitTime > self.RestartInterval:
+			self.restartApp(True, True)
+			return
 
-			self.RestartJobId = self.JobId if wantClear else -1
-			self.RestartClientJobEvent.set()
+		if wantClear or refreshVPM or self.NotifyAllJobs:
+			self.NotifyJobId = -1 if self.NotifyAllJobs or not wantClear else self.JobId
+			self.JobNotifyEvent.set()
 
 		self.UpdateTask = self.schedule(self.updateJob, self.jobUpdateTime + 55)
 
