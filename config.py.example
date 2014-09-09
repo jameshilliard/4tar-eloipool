@@ -33,6 +33,9 @@ GetTxnsInterval = 10
 # Minimal restart interval if no share submitted in past
 RestartInterval = 601
 
+# Stratum server job update interval, should be >10 at least
+JobUpdateInterval = 55
+
 # Notify all job updates immediately or only the restart/VPM job
 NotifyAllJobs = False
 
