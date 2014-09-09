@@ -394,7 +394,8 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.MaxSubmitInterval = 0
 		self.GetTxnsInterval = 0
 		self.NotifyAllJobs = False
-		self.jobUpdateTime = self.lastSubmitTime = time()
+		self.jobUpdateTime = self.lastSubmitTime = self.start_time
+		self.JobUpdateInterval = 55
 		self.PrivateMining = {}
 		self.JobNotifyEvent = threading.Event()
 		threading.Thread(target = self._NotifyClientJob).start() 
@@ -567,15 +568,17 @@ class StratumServer(networkserver.AsyncSocketServer):
 			self.networkTarget = networkTarget
 
 		self.jobUpdateTime = self.updateJobOnly(wantClear = wantClear)
-		if self.jobUpdateTime - self.lastSubmitTime > self.RestartInterval:
-			self.restartApp(True, True)
-			return
-
 		if wantClear or refreshVPM or self.NotifyAllJobs:
 			self.NotifyJobId = -1 if self.NotifyAllJobs or not wantClear else self.JobId
 			self.JobNotifyEvent.set()
 
-		self.UpdateTask = self.schedule(self.updateJob, self.jobUpdateTime + 55)
+		self.UpdateTask = self.schedule(self.updateJob, self.jobUpdateTime + self.JobUpdateInterval)
+
+	def on_idle(self, no_client = False):
+		if no_client and self.lastidle - self.start_time > self.RestartInterval or
+			self.lastidle - self.lastSubmitTime > self.RestartInterval:
+			self.restartApp(True, True)
+			return
 
 	def getSessionId(self, client):
 		sid = self.SessionIdRange[0] + client.fd

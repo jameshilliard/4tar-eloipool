@@ -37,6 +37,7 @@ dynConfigItems = [
 	( 'MaxSubmitInterval', 40 ),
 	( 'GetTxnsInterval', 10 ),
 	( 'RestartInterval', 601 ),
+	( 'JobUpdateInterval', 55 ),
 	( 'NotifyAllJobs', False ),
 ]
 

@@ -349,6 +349,7 @@ class AsyncSocketServer:
 		self.keepgoing = True
 		self.rejecting = False
 		self.lastidle = 0
+		self.start_time = time()
 
 		self._epoll = select.epoll()
 		self._fd = {}
@@ -416,9 +417,13 @@ class AsyncSocketServer:
 		for c in conns:
 			tryErr(lambda: c.boot())
 
+	def on_idle(self, no_client = False):
+		pass
+
 	def serve_forever(self):
 		self.running = True
 		self.final_init()
+
 		while self.keepgoing:
 			self.doing = 'pre-schedule'
 			self.pre_schedule()
@@ -465,6 +470,7 @@ class AsyncSocketServer:
 			self.doing = 'events'
 			if not events:
 				self.lastidle = time()
+				self.on_idle(len(self.connections) == 0)
 			for (fd, e) in events:
 				o = self._fd.get(fd)
 				if o is None: continue
