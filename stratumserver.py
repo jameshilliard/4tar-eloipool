@@ -575,8 +575,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		self.UpdateTask = self.schedule(self.updateJob, self.jobUpdateTime + self.JobUpdateInterval)
 
 	def on_idle(self, no_client = False):
-		if no_client and self.lastidle - self.start_time > self.RestartInterval or
-			self.lastidle - self.lastSubmitTime > self.RestartInterval:
+		if no_client and self.lastidle - self.start_time > self.RestartInterval or self.lastidle - self.lastSubmitTime > self.RestartInterval:
 			self.restartApp(True, True)
 			return
 
