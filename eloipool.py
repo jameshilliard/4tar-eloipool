@@ -39,18 +39,25 @@ dynConfigItems = [
 	( 'RestartInterval', 601 ),
 	( 'JobUpdateInterval', 55 ),
 	( 'NotifyAllJobs', False ),
+	( 'LogClient', False ),
 ]
+
+import re
+reNotNumber = re.compile('[^0-9]')
+reNotHexNumber = re.compile('[^a-fA-F0-9]')
 
 def getConfigValue(strVal):
 	strVal = strVal.strip()
-	if strVal[0:2] == '0x':
+	if strVal[0:2] == '0x' and not reNotHexNumber.search(strVal):
 		return int(strVal, 16)
 	elif strVal == 'True':
 		return True
 	elif strVal == 'False':
 		return False
-	else:
+	elif not reNotNumber.search(strVal):
 		return int(strVal)
+	else:
+		return strVal
 
 def loadConfig(confMod, init = False):
 	global config

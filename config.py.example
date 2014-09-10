@@ -39,6 +39,9 @@ JobUpdateInterval = 55
 # Notify all job updates immediately or only the restart/VPM job
 NotifyAllJobs = False
 
+# Whether log client input or not, can be a specified username or minername
+LogClient = False
+
 # Session Id Range
 SessionIdRange = (0, 0xffff)
 

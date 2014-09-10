@@ -70,7 +70,8 @@ class StratumHandler(networkserver.SocketHandler):
 		self.lastSubmitJobId = 0
 		self.lastGetTxnsJobId = 0
 		self.JobTargets = collections.OrderedDict()
-		self.UN = self.UA = None
+		self.UN = (None, None)
+		self.UA = None
 		self.VPM = self.Authorized = self.Subscribed = False
 		#self.LicenseSent = agplcompliance._SourceFiles is None
 
@@ -91,7 +92,8 @@ class StratumHandler(networkserver.SocketHandler):
 		if not inbuf:
 			return
 
-		self.logger.debug("%s< %s" % (str(self.addr), inbuf))
+		if self.server.LogClient in (True, self.UN[0], self.UN[1]):
+			self.logger.debug("%s< %s" % (str(self.addr), inbuf))
 
 		try:
 			rpc = json.loads(inbuf)
