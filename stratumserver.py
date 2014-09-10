@@ -526,10 +526,8 @@ class StratumServer(networkserver.AsyncSocketServer):
 
 			NotifyJobId = self.NotifyJobId
 
-			count = len(Clients)
+			sent_count = count = len(Clients)
 			self.logger.info("%d clients to notify job update..." % (count,))
-
-			now = time()
 
 			# There is a possibility that in the below loop, the updateJob() has updated a
 			# current restart job to a non-restart-one, that may cause all after-changing
@@ -543,10 +541,10 @@ class StratumServer(networkserver.AsyncSocketServer):
 					try:
 						client.sendJob()
 					except socket.error:
-						count -= 1
+						sent_count -= 1
 						# Ignore socket errors; let the main event loop take care of them later
 					except:
-						count -= 1
+						sent_count -= 1
 						self.logger.warning('Error sending new job:\n' + traceback.format_exc())
 
 				if NotifyJobId == -1:
@@ -555,7 +553,9 @@ class StratumServer(networkserver.AsyncSocketServer):
 				while i == 0 and self.JobId == NotifyJobId:
 					sleep(0.03)
 
-			self.logger.info('Job notification sent to %d clients in %.3f seconds' % (count, time() - now))
+			now = time()
+			if now - self.jobUpdateTime > 1 or count != sent_count:
+				self.logger.info('Job notification sent to %d/%d/%d clients in %.3f seconds' % (send_count, count, len(Clients), now - self.jobUpdateTime))
 
 	def updateJob(self, wantClear = False, networkTarget = None, refreshVPM = False):
 		if self.UpdateTask:
