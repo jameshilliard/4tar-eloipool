@@ -555,9 +555,9 @@ class StratumServer(networkserver.AsyncSocketServer):
 				while i == 0 and self.JobId == NotifyJobId:
 					sleep(0.03)
 
-			now = time()
-			if now - self.jobUpdateTime > 1 or count != sent_count:
-				self.logger.info('Job notification sent to %d/%d/%d clients in %.3f seconds' % (send_count, count, len(Clients), now - self.jobUpdateTime))
+			elapsed_time = time() - self.jobUpdateTime
+			if elapsed_time > 1 or count != sent_count:
+				self.logger.info('Job notification sent to %d/%d/%d clients in %.3f seconds' % (send_count, count, len(Clients), elapsed_time))
 
 	def updateJob(self, wantClear = False, networkTarget = None, refreshVPM = False):
 		if self.UpdateTask:

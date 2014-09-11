@@ -48,7 +48,7 @@ reNotHexNumber = re.compile('[^a-fA-F0-9]')
 
 def getConfigValue(strVal):
 	strVal = strVal.strip()
-	if strVal[0:2] == '0x' and not reNotHexNumber.search(strVal):
+	if strVal[0:2] == '0x' and not reNotHexNumber.search(strVal[2:]):
 		return int(strVal, 16)
 	elif strVal == 'True':
 		return True
