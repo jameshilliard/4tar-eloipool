@@ -217,7 +217,7 @@ ShareLogging = (
 	{
 		'type': 'logfile',
 		'filename': 'share-logfile',
-		'format': "{time} {Q(remoteHost)} {username} {YN(not(rejectReason))} {dash(YN(upstreamResult))} {dash(rejectReason)} 0 {jobid} {diff} {HEX(extranonce1)} {HEX(extranonce2)} {UPK(ntime)} {HEX(nonce)}\n",
+		'format': "{time} {Q(remoteHost)} {username} {YN(not(rejectReason))} {dash(YN(upstreamResult))} {dash(rejectReason)} {cointype} {jobid} {diff} {HEX(extranonce1)} {HEX(extranonce2)} {UPK(ntime)} {HEX(nonce)}\n",
 	},
 	{
 		'type': 'sql',
@@ -239,7 +239,7 @@ ShareLogging = (
 			'user': 'eloipool',
 			'password': 'somethingsecret',
 		},
-		'statement': "insert into shares (rem_host, username, our_result, upstream_result, reason, solution) values ({Q(remoteHost)}, {username}, {YN(not(rejectReason))}, {YN(upstreamResult)}, {rejectReason}, unhex({solution}))",
+		'statement': "insert into shares(host,miner,reject_reason,upstream_result,created_at,updated_at,cointype,round_index,diff) values({Q(remoteHost)},{username},{rejectReason},{YN(upstreamResult)},from_unixtime({time}),now(),{cointype},{height},{diff})",
 	},
 	{
 		'type': 'sql',

@@ -313,6 +313,7 @@ class StratumHandler(networkserver.SocketHandler):
 			'nonce': bytes.fromhex(nonce),
 			'height': self.server.Height,
 			'time': submitTime,
+			'cointype': 0x100 if self.VPM else 0,
 			'targetUp': self.targetUp[0] if self.targetUp[1] else 0
 		}
 		if jobid in self.JobTargets:
