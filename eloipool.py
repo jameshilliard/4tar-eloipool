@@ -50,14 +50,18 @@ def getConfigValue(strVal):
 	strVal = strVal.strip()
 	if strVal[0:2] == '0x' and not reNotHexNumber.search(strVal[2:]):
 		return int(strVal, 16)
+	elif not reNotNumber.search(strVal):
+		return int(strVal)
+	elif len(strVal) > 1 and strVal[0] in ("'", '"') and strVal[-1] == strVal[0]:
+		return strVal[1:-1]
 	elif strVal == 'True':
 		return True
 	elif strVal == 'False':
 		return False
-	elif not reNotNumber.search(strVal):
-		return int(strVal)
+	elif strVal == 'None':
+		return None
 	else:
-		return strVal
+		raise ValueError('Unknown config item: %s' % strVal)
 
 def loadConfig(confMod, init = False):
 	global config

@@ -167,13 +167,16 @@ class StratumHandler(networkserver.SocketHandler):
 		if len(self.JobTargets) > 4:
 			if self.lastSubmitTime + 600 < self.server.jobUpdateTime:
 				self.sendMessage('Long time no submission, disconnect now.')
+				if self.server.LogClient in (True, self.UN[0], self.UN[1]):
+					self.logger.debug("Disconnect %d/%s@%s for long idle" % (self._sid, self.UN[0], str(self.addr)))
 				self.boot()
 				return
 
 			self.JobTargets.popitem(False)
 		elif not len(self.JobTargets):
 			diff = target2bdiff(self.target)
-			self.logger.debug("Initialize difficulty to %s for %d/%s@%s" % (diff, self._sid, self.UN[0], str(self.addr)))
+			if self.server.LogClient in (True, self.UN[0], self.UN[1]):
+				self.logger.debug("Initialize difficulty to %s for %d/%s@%s" % (diff, self._sid, self.UN[0], str(self.addr)))
 			self.sendReply({
 				'id': None,
 				'method': 'mining.set_difficulty',
@@ -268,7 +271,8 @@ class StratumHandler(networkserver.SocketHandler):
 						if self.target < self.server.networkTarget:
 							self.target = self.server.networkTarget
 						newBdiff = target2bdiff(self.target)
-						self.logger.debug("Increase difficulty to %s for %d/%s@%s" % (newBdiff, self._sid, username, str(self.addr)))
+						if self.server.LogClient in (True, self.UN[0], self.UN[1]):
+							self.logger.debug("Increase difficulty to %s for %d/%s@%s" % (newBdiff, self._sid, username, str(self.addr)))
 					self.submitTimeCount = 0
 				else:
 					self.submitTimeCount = 1
@@ -282,7 +286,8 @@ class StratumHandler(networkserver.SocketHandler):
 						if self.target > self.server.DefaultShareTarget:
 							self.target = self.server.DefaultShareTarget
 						newBdiff = target2bdiff(self.target)
-						self.logger.debug("Decrease difficulty to %s for %d/%s@%s" % (newBdiff, self._sid, username, str(self.addr)))
+						if self.server.LogClient in (True, self.UN[0], self.UN[1]):
+							self.logger.debug("Decrease difficulty to %s for %d/%s@%s" % (newBdiff, self._sid, username, str(self.addr)))
 					self.submitTimeCount = 0
 				else:
 					self.submitTimeCount -= 1
