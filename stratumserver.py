@@ -55,9 +55,7 @@ class StratumHandler(networkserver.SocketHandler):
 
 	def __init__(self, *a, **ka):
 		super().__init__(*a, **ka)
-		self.remoteHost = self.addr[0]
-		if self.remoteHost[0:7] == '::ffff:':
-			self.remoteHost = self.remoteHost[7:]
+		self.remoteHost = '%s-%d' % (self.addr[0][7:] if self.addr[0][0:7] == '::ffff:' else self.addr[0], self.addr[1])
 		self.changeTask(None)
 		self.target = self.server.DefaultShareTarget
 		# targetUp targetUpCount targetIncCount
