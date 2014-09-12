@@ -162,6 +162,9 @@ class StratumHandler(networkserver.SocketHandler):
 		if self.server.JobId in self.JobTargets:
 			return
 
+		if not self.lastSubmitTime:
+			self.lastSubmitTime = self.server.jobUpdateTime
+
 		if len(self.JobTargets) > 4:
 			if self.lastSubmitTime + 600 < self.server.jobUpdateTime:
 				self.sendMessage('Long time no submission, disconnect now.')
