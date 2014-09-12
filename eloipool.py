@@ -40,6 +40,7 @@ dynConfigItems = [
 	( 'JobUpdateInterval', 55 ),
 	( 'NotifyAllJobs', False ),
 	( 'LogClient', False ),
+	( 'SessionIdRange', [ 4, 4, 0, 0xffff ] ),
 ]
 
 import re
@@ -60,6 +61,12 @@ def getConfigValue(strVal):
 		return False
 	elif strVal == 'None':
 		return None
+	elif strVal[0] == '[' and strVal[-1] == ']':
+		a = strVal[1:-1].split(',')
+		retVal = []
+		for i in range(0, len(a)):
+			retVal += [getConfigValue(a[i])]
+		return retVal
 	else:
 		raise ValueError('Unknown config item: %s' % strVal)
 
@@ -838,12 +845,8 @@ if __name__ == "__main__":
 	stratumsrv.RaiseRedFlags = RaiseRedFlags
 	stratumsrv.IsJobValid = IsJobValid
 	stratumsrv.restartApp = exitApp
-	if hasattr(config, 'SessionIdRange'):
-		#stratumsrv.sidMgr = UniqueIdManager(config.SessionIdRange[0], config.SessionIdRange[1])
-		stratumsrv.SessionIdRange = config.SessionIdRange
-	else:
-		#stratumsrv.sidMgr = UniqueIdManager()
-		stratumsrv.SessionIdRange = (0, 0xFFFF)
+	#stratumsrv.sidMgr = UniqueIdManager(config.SessionIdRange[1], config.SessionIdRange[2])
+	stratumsrv.setSessionIdRange(config.SessionIdRange)
 	#stratumsrv.checkAuthentication = checkAuthentication
 	if not hasattr(config, 'StratumAddresses'):
 		config.StratumAddresses = ()

@@ -230,7 +230,11 @@ class StratumHandler(networkserver.SocketHandler):
 		if self.Authorized:
 			self.changeTask(self.sendJob, 0)
 
-		xid = struct.pack('=I', self._sid)  # NOTE: Assumes sessionids are 4 bytes
+		xid = struct.pack('>Q', self._sid)
+		while xid[0] == 0:
+			xid = xid[1:]
+		while len(xid) < len(self.server.extranonce1null):
+			xid += b'\0'
 		self.extranonce1 = xid
 		xid = b2a_hex(xid).decode('ascii')
 		self.server._Clients[id(self)] = self
@@ -240,7 +244,7 @@ class StratumHandler(networkserver.SocketHandler):
 				['mining.set_difficulty', '%s2' % (xid,)],
 			],
 			xid,
-			4,
+			self.server.extranonce2size,
 		]
 
 	def close(self):
@@ -384,8 +388,6 @@ class StratumServer(networkserver.AsyncSocketServer):
 	waker = True
 	schMT = True
 
-	extranonce1null = struct.pack('=I', 0)  # NOTE: Assumes sessionids are 4 bytes
-
 	def __init__(self, *a, **ka):
 		ka.setdefault('RequestHandlerClass', StratumHandler)
 		super().__init__(*a, **ka)
@@ -414,7 +416,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 		(MC, now) = self.getStratumJob(JobId, wantClear = wantClear)
 		(height, merkleTree, cb, prevBlock, bits) = MC[:5]
 
-		if len(cb) > 96 - len(self.extranonce1null) - 4:
+		if len(cb) > 96 - len(self.extranonce1null) - self.extranonce2size:
 			if not self.rejecting:
 				self.logger.warning('Coinbase too big for stratum: disabling')
 			self.rejecting = True
@@ -428,7 +430,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 			self.logger.info('Coinbase small enough for stratum again: re-enabling')
 
 		txn = deepcopy(merkleTree.data[0])
-		cb += self.extranonce1null + b'4tar'
+		cb += self.extranonce1null + b'37pool.com'[:self.extranonce2size]
 		txn.setCoinbase(cb)
 		txn.assemble()
 		pos = txn.data.index(cb) + len(cb)
@@ -442,7 +444,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 			'params': [
 				"%d" % (JobId),
 				b2a_hex(swap32(prevBlock)).decode('ascii'),
-				b2a_hex(txn.data[:pos - len(self.extranonce1null) - 4]).decode('ascii'),
+				b2a_hex(txn.data[:pos - len(self.extranonce1null) - self.extranonce2size]).decode('ascii'),
 				b2a_hex(txn.data[pos:]).decode('ascii'),
 				steps,
 				'00000002',
@@ -461,7 +463,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 				'params': [
 					"%d" % (JobId),
 					b2a_hex(swap32(prevBlock)).decode('ascii'),
-					b2a_hex(txn.data[:pos - len(self.extranonce1null) - 4]).decode('ascii'),
+					b2a_hex(txn.data[:pos - len(self.extranonce1null) - self.extranonce2size]).decode('ascii'),
 					b2a_hex(txn.data[pos:]).decode('ascii'),
 					steps,
 					'00000002',
@@ -493,7 +495,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 				'params': [
 					"%d" % (JobId),
 					b2a_hex(swap32(prevBlock)).decode('ascii'),
-					b2a_hex(txn.data[:pos - len(self.extranonce1null) - 4]).decode('ascii'),
+					b2a_hex(txn.data[:pos - len(self.extranonce1null) - self.extranonce2size]).decode('ascii'),
 					b2a_hex(txn.data[pos:]).decode('ascii'),
 					steps,
 					'00000002',
@@ -585,10 +587,22 @@ class StratumServer(networkserver.AsyncSocketServer):
 			self.restartApp(True, True)
 			return
 
+	def setSessionIdRange(self, sidRange):
+		if sidRange[0] > 8 or sidRange[1] > len('37pool.com') or sidRange[2] > sidRange[3] or sidRange[3] > 0x100 ** sidRange[0] - 1:
+			raise ValueError('Invalid SessionIdRange')
+
+		self.extranonce1null = b''
+		for i in range(0, sidRange[0]):
+			self.extranonce1null += b'\0'
+
+		self.extranonce2size = sidRange[1]
+
+		self.SessionIdRange = sidRange
+
 	def getSessionId(self, client):
-		sid = self.SessionIdRange[0] + client.fd
-		if sid > self.SessionIdRange[1]:
-			raise self.RaiseRedFlags(RuntimeError('sessionid %08x out of range' % sid))
+		sid = self.SessionIdRange[2] + client.fd
+		if sid > self.SessionIdRange[3]:
+			raise self.RaiseRedFlags(RuntimeError('sessionid %d/0x%x out of range %s' % (sid, sid, str(self.SessionIdRange))))
 		#if self._Clients.get(sid) not in (client, None):
 		#	raise self.RaiseRedFlags(RuntimeError('issuing duplicate sessionid %08x' % sid))
 		return sid
