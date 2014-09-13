@@ -233,10 +233,12 @@ class StratumHandler(networkserver.SocketHandler):
 		if self.Authorized:
 			self.changeTask(self.sendJob, 0)
 
+		extranonce2size = self.server.extranonce2size if (self.UA and self.UA[:7] == '37proxy') or self.server.extranonce2size < 2 else 2
+
 		xid = struct.pack('>Q', self._sid)
 		while xid[0] == 0:
 			xid = xid[1:]
-		while len(xid) < len(self.server.extranonce1null):
+		while len(xid) < len(self.server.extranonce1null) + self.server.extranonce2size - extranonce2size:
 			xid += b'\0'
 		self.extranonce1 = xid
 		xid = b2a_hex(xid).decode('ascii')
@@ -247,7 +249,7 @@ class StratumHandler(networkserver.SocketHandler):
 				['mining.set_difficulty', '%s2' % (xid,)],
 			],
 			xid,
-			self.server.extranonce2size,
+			extranonce2size,
 		]
 
 	def close(self):
