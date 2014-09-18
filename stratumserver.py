@@ -74,7 +74,7 @@ class StratumHandler(networkserver.SocketHandler):
 		#self.LicenseSent = agplcompliance._SourceFiles is None
 
 	def sendReply(self, ob):
-		self.push(json.dumps(ob).encode('ascii') + b"\n")
+		self.push(json.dumps(ob, separators = (',', ':')).encode('ascii') + b"\n")
 
 	def sendMessage(self, msg):
 		self.sendReply({
@@ -457,7 +457,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 				b2a_hex(struct.pack('>L', int(now))).decode('ascii'),
 				Restart
 			],
-		}).encode('ascii') + b"\n"
+		}, separators = (',', ':')).encode('ascii') + b"\n"
 
 		if Restart:
 			self.JobBytesRestart = self.JobBytes
@@ -476,7 +476,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 					b2a_hex(struct.pack('>L', int(now))).decode('ascii'),
 					True
 				],
-			}).encode('ascii') + b"\n"
+			}, separators = (',', ':')).encode('ascii') + b"\n"
 
 		payoutCount = len(txn.outputs)		# Should always be 1 in our implementation
 		(cbValue, ourAddr) = txn.outputs[0]	# So should be the only one
@@ -508,7 +508,7 @@ class StratumServer(networkserver.AsyncSocketServer):
 					b2a_hex(struct.pack('>L', int(now))).decode('ascii'),
 					Restart or refreshed > 0
 				],
-			}).encode('ascii') + b"\n"
+			}, separators = (',', ':')).encode('ascii') + b"\n"
 			self.PrivateMining[username] = (pmConfig, JobBytes, 0)
 
 		job = {
