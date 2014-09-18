@@ -810,19 +810,19 @@ if __name__ == "__main__":
 		except:
 			logging.getLogger('sharelogging').error("Error setting up share logger %s: %s", name,  sys.exc_info())
 
-	if not hasattr(config, 'Authentication'):
-		config.Authentication = ({'module': 'allowall'},)
+#	if not hasattr(config, 'Authentication'):
+#		config.Authentication = ({'module': 'allowall'},)
 
-	for i in config.Authentication:
-		name = i['module']
-		parameters = i
-		try:
-			fp, pathname, description = imp.find_module(name, authentication.__path__)
-			m = imp.load_module(name, fp, pathname, description)
-			lo = getattr(m, name)(**parameters)
-			authenticators.append(lo)
-		except:
-			logging.getLogger('authentication').error("Error setting up authentication module %s: %s", name, sys.exc_info())
+#	for i in config.Authentication:
+#		name = i['module']
+#		parameters = i
+#		try:
+#			fp, pathname, description = imp.find_module(name, authentication.__path__)
+#			m = imp.load_module(name, fp, pathname, description)
+#			lo = getattr(m, name)(**parameters)
+#			authenticators.append(lo)
+#		except:
+#			logging.getLogger('authentication').error("Error setting up authentication module %s: %s", name, sys.exc_info())
 
 #	LSbc = []
 #	if not hasattr(config, 'BitcoinNodeAddresses'):
