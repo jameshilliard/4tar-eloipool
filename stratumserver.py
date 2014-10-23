@@ -49,6 +49,7 @@ StratumCodes = {
 	'stale-txlist-req': 26,
 	'too-frequent-txlist-req': 26,
 	'too-small-diff': 27,
+	'too-late-diff-setting': 27,
 }
 
 class StratumHandler(networkserver.SocketHandler):
@@ -216,6 +217,9 @@ class StratumHandler(networkserver.SocketHandler):
 		return True
 
 	def _stratum_mining_set_difficulty(self, diff, rpc = True):
+		if self.lastSubmitJobId:
+			raise StratumError(27, 'too-late-diff-setting', False, "Difficulty can only be set at the begin", True)
+
 		target = bdiff2target(diff)
 		if target > self.server.DefaultShareTarget:
 			if rpc:
