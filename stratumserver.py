@@ -28,7 +28,7 @@ import re
 from time import time, sleep
 from math import ceil
 import traceback
-from util import RejectedShare, swap32, target2bdiff
+from util import RejectedShare, swap32, target2bdiff, bdiff2target
 
 class StratumError(BaseException):
 	def __init__(self, errno, msg, trace = False, extraMsg = None, disconnect = False):
@@ -47,7 +47,8 @@ StratumCodes = {
 	'not-subscribed': 25,
 	'no-txlist-for-vpm': 26,
 	'stale-txlist-req': 26,
-	'too-frequent-txlist-req': 26
+	'too-frequent-txlist-req': 26,
+	'too-small-diff': 27,
 }
 
 class StratumHandler(networkserver.SocketHandler):
@@ -121,11 +122,12 @@ class StratumHandler(networkserver.SocketHandler):
 		try:
 			rv = getattr(self, funcname)(*rpc['params'])
 		except StratumError as e:
-			self.sendReply({
-				'error': (e.error[0], e.error[1], traceback.format_exc() if e.error[2] else None),
-				'id': rpc['id'],
-				'result': None,
-			})
+			if rpc['id']:
+				self.sendReply({
+					'error': (e.error[0], e.error[1], traceback.format_exc() if e.error[2] else None),
+					'id': rpc['id'],
+					'result': None,
+				})
 			if e.extraMsg:
 				self.sendMessage(e.extraMsg)
 			if e.disconnect:
@@ -142,14 +144,12 @@ class StratumHandler(networkserver.SocketHandler):
 				self.logger.debug(fexc)
 			return
 
-		if rpc['id'] is None:
-			return
-
-		self.sendReply({
-			'error': None,
-			'id': rpc['id'],
-			'result': rv,
-		})
+		if rpc['id']:
+			self.sendReply({
+				'error': None,
+				'id': rpc['id'],
+				'result': rv,
+			})
 
 #	def sendLicenseNotice(self):
 #		if self.fd == -1:
@@ -174,7 +174,7 @@ class StratumHandler(networkserver.SocketHandler):
 				return
 
 			self.JobTargets.popitem(False)
-		elif not len(self.JobTargets):
+		elif self.targetUp[2] and not len(self.JobTargets):
 			diff = target2bdiff(self.target)
 			if self.server.LogClient in (True, self.UN[0], self.UN[1]):
 				self.logger.debug("Initialize difficulty to %s for %d/%s@%s" % (diff, self._sid, self.UN[0], str(self.addr)))
@@ -215,7 +215,22 @@ class StratumHandler(networkserver.SocketHandler):
 
 		return True
 
-	def _stratum_mining_subscribe(self, UA = None, xid = None):
+	def _stratum_mining_set_difficulty(self, diff, rpc = True):
+		target = bdiff2target(diff)
+		if target > self.server.DefaultShareTarget:
+			if rpc:
+				raise StratumError(27, 'too-small-diff')
+			self.sendMessage('Too small diff value %s, ignored' % diff)
+			return
+
+		self.targetUp = [ 0, 0, 0 ]
+		self.target = target
+		if self.server.LogClient in (True, self.UN[0], self.UN[1]):
+			self.logger.debug("Fix difficulty to %s for %d/%s@%s" % (diff, self._sid, self.UN[0], str(self.addr)))
+
+		return True
+
+	def _stratum_mining_subscribe(self, UA = None, xid = None, diff = None):
 		if not UA is None:
 			self.UA = UA
 		if not self.UA:
@@ -228,6 +243,9 @@ class StratumHandler(networkserver.SocketHandler):
 		if not hasattr(self, '_sid'):
 			#self._sid = self.server.sidMgr.get()
 			self._sid = self.server.getSessionId(self)
+
+		if diff:
+			self._stratum_mining_set_difficulty(diff, False)
 
 		self.Subscribed = True
 		if self.Authorized:
@@ -267,45 +285,46 @@ class StratumHandler(networkserver.SocketHandler):
 		#	raise StratumError(24, 'unauthorized-user')
 		submitTime = time()
 		newBdiff = 0
-		targetUp = False
-		if self.server.MinSubmitInterval:
-			if submitTime - self.lastSubmitTime < self.server.MinSubmitInterval:
-				if self.submitTimeCount > 0:
-					if self.target != self.server.networkTarget:
-						targetUp = True
+		if self.targetUp[2]:
+			targetUp = False
+			if self.server.MinSubmitInterval:
+				if submitTime - self.lastSubmitTime < self.server.MinSubmitInterval:
+					if self.submitTimeCount > 0:
+						if self.target != self.server.networkTarget:
+							targetUp = True
 
-						self.target /= 2
-						if self.target < self.server.networkTarget:
-							self.target = self.server.networkTarget
-						newBdiff = target2bdiff(self.target)
-						if self.server.LogClient in (True, self.UN[0], self.UN[1]):
-							self.logger.debug("Increase difficulty to %s for %d/%s@%s" % (newBdiff, self._sid, username, str(self.addr)))
+							self.target /= 2
+							if self.target < self.server.networkTarget:
+								self.target = self.server.networkTarget
+							newBdiff = target2bdiff(self.target)
+							if self.server.LogClient in (True, self.UN[0], self.UN[1]):
+								self.logger.debug("Increase difficulty to %s for %d/%s@%s" % (newBdiff, self._sid, username, str(self.addr)))
+						self.submitTimeCount = 0
+					else:
+						self.submitTimeCount = 1
+				elif self.submitTimeCount > 0:
 					self.submitTimeCount = 0
-				else:
-					self.submitTimeCount = 1
-			elif self.submitTimeCount > 0:
-				self.submitTimeCount = 0
-		if not newBdiff and self.server.MaxSubmitInterval:
-			if submitTime - self.lastSubmitTime > self.server.MaxSubmitInterval:
-				if self.submitTimeCount < -1:
-					if self.target != self.server.DefaultShareTarget:
-						self.target *= 2
-						if self.target > self.server.DefaultShareTarget:
-							self.target = self.server.DefaultShareTarget
-						newBdiff = target2bdiff(self.target)
-						if self.server.LogClient in (True, self.UN[0], self.UN[1]):
-							self.logger.debug("Decrease difficulty to %s for %d/%s@%s" % (newBdiff, self._sid, username, str(self.addr)))
+			if not newBdiff and self.server.MaxSubmitInterval:
+				if submitTime - self.lastSubmitTime > self.server.MaxSubmitInterval:
+					if self.submitTimeCount < -1:
+						if self.target != self.server.DefaultShareTarget:
+							self.target *= 2
+							if self.target > self.server.DefaultShareTarget:
+								self.target = self.server.DefaultShareTarget
+							newBdiff = target2bdiff(self.target)
+							if self.server.LogClient in (True, self.UN[0], self.UN[1]):
+								self.logger.debug("Decrease difficulty to %s for %d/%s@%s" % (newBdiff, self._sid, username, str(self.addr)))
+						self.submitTimeCount = 0
+					else:
+						self.submitTimeCount -= 1
+				elif self.submitTimeCount < 0:
 					self.submitTimeCount = 0
-				else:
-					self.submitTimeCount -= 1
-			elif self.submitTimeCount < 0:
-				self.submitTimeCount = 0
-		if newBdiff:
-			self.sendReply({
-				'id': None,
-				'method': 'mining.set_difficulty',
-				'params': [ newBdiff ],
-			})
+			if newBdiff:
+				self.sendReply({
+					'id': None,
+					'method': 'mining.set_difficulty',
+					'params': [ newBdiff ],
+				})
 		self.server.lastSubmitTime = self.lastSubmitTime = submitTime
 
 		self.lastSubmitJobId = jobid = int(jobid)

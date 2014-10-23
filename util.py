@@ -56,6 +56,9 @@ def target2bdiff(target):
 	bdiff = bdiff1target / target
 	return _maybe_int(bdiff)
 
+def bdiff2target(diff):
+	return int(bdiff1target / diff)
+
 class shareLogFormatter:
 	_re_x = re.compile(r'^\s*(\w+)\s*(?:\(\s*(.*?)\s*\))?\s*$')
 
