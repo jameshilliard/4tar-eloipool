@@ -217,6 +217,9 @@ class StratumHandler(networkserver.SocketHandler):
 		if self.Subscribed:
 			self.changeTask(self.sendJob, 0)
 
+		if self.UN[1] == 'antpool':
+			self._stratum_mining_set_difficulty(4096, False, False)
+
 		return True
 
 	def _stratum_mining_set_difficulty(self, diff, rpc = True, addTarget = True):
