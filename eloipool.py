@@ -501,8 +501,9 @@ def checkShare(share):
 	share['merkletree'] = workMerkleTree
 	cbtxn = deepcopy(workMerkleTree.data[0])
 	pmConfig = None
-	if username in config.PrivateMining and config.PrivateMining[username][1]:
-		pmConfig = config.PrivateMining[username][0]
+	UN = username.split('.')[0]
+	if UN in config.PrivateMining and config.PrivateMining[UN][1]:
+		pmConfig = config.PrivateMining[UN][0]
 		cbValue = cbtxn.outputs[0][0]
 		if pmConfig[1]:
 			profit = ceil(cbValue  * pmConfig[1])
@@ -526,7 +527,7 @@ def checkShare(share):
 	blkhash = dblsha(data)
 	blkhashn = LEhash2int(blkhash)
 	if blkhashn > config.DefaultShareTarget:
-		raise RejectedShare('H-not-zero')
+		raise RejectedShare('h-not-zero')
 
 	global networkTarget
 	if blkhashn <= networkTarget:
