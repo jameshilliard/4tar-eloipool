@@ -50,6 +50,7 @@ StratumCodes = {
 	'too-frequent-txlist-req': 26,
 	'too-small-diff': 27,
 	'too-late-diff-setting': 27,
+	'too-fast-submission': 28,
 }
 
 class StratumHandler(networkserver.SocketHandler):
@@ -175,7 +176,7 @@ class StratumHandler(networkserver.SocketHandler):
 				return
 
 			self.JobTargets.popitem(False)
-		elif self.targetUp[2] and not len(self.JobTargets):
+		elif not len(self.JobTargets):
 			diff = target2bdiff(self.target)
 			if self.server.LogClient in (True, self.UN[0], self.UN[1]):
 				self.logger.debug("Initialize difficulty to %s for %d/%s@%s" % (diff, self._sid, self.UN[0], str(self.addr)))
@@ -201,7 +202,9 @@ class StratumHandler(networkserver.SocketHandler):
 				self.push(self.server.JobBytes)
 
 	def _stratumreply_7(self, rpc):
-		self.UA = rpc.get('result') or rpc
+		UA = rpc.get('result') or rpc
+		UA = UA.split('/')
+		self.UA = ( UA[0], UA[1:] )
 
 	def _stratum_mining_authorize(self, username, password = None):
 		self.UN = (username, username.split('.')[0])
@@ -216,7 +219,7 @@ class StratumHandler(networkserver.SocketHandler):
 
 		return True
 
-	def _stratum_mining_set_difficulty(self, diff, rpc = True):
+	def _stratum_mining_set_difficulty(self, diff, rpc = True, addTarget = True):
 		if self.lastSubmitJobId:
 			raise StratumError(27, 'too-late-diff-setting', False, "Difficulty can only be set at the begin", True)
 
@@ -232,11 +235,15 @@ class StratumHandler(networkserver.SocketHandler):
 		if self.server.LogClient in (True, self.UN[0], self.UN[1]):
 			self.logger.debug("Fix difficulty to %s for %d/%s@%s" % (diff, self._sid, self.UN[0], str(self.addr)))
 
+		if addTarget:
+			self.JobTargets[self.server.JobId] = target
+
 		return True
 
 	def _stratum_mining_subscribe(self, UA = None, xid = None, diff = None):
 		if not UA is None:
-			self.UA = UA
+			UA = UA.split('/')
+			self.UA = ( UA[0], UA[1:] )
 		if not self.UA:
 			self.sendReply({
 				'id': 7,
@@ -255,7 +262,7 @@ class StratumHandler(networkserver.SocketHandler):
 		if self.Authorized:
 			self.changeTask(self.sendJob, 0)
 
-		extranonce2size = self.server.extranonce2size if (self.UA and self.UA[:7] == '37proxy') or self.server.extranonce2size < 2 else 2
+		extranonce2size = self.server.extranonce2size if (self.UA and self.UA[0] == '37proxy') or self.server.extranonce2size < 2 else 2
 
 		xid = struct.pack('>Q', self._sid)
 		while xid[0] == 0:
@@ -370,7 +377,7 @@ class StratumHandler(networkserver.SocketHandler):
 			rej = str(rej)
 			errno = StratumCodes.get(rej, 20)
 			self.submitError += 1
-			if self.submitError < 10:
+			if self.submitError < 10 or self.UA[0] == '37proxy':
 				raise StratumError(errno, rej)
 			raise StratumError(errno, rej, False, 'Too many errors found in your submission, disconnect now.', True)
 
