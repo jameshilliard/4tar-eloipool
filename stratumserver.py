@@ -38,6 +38,7 @@ class StratumError(BaseException):
 
 StratumCodes = {
 	'unknown': 20,
+	'null-job-id': 20,
 	'stale-prevblk': 21,
 	'stale-work': 21,
 	'duplicate': 22,
@@ -66,6 +67,7 @@ class StratumHandler(networkserver.SocketHandler):
 		#self.server.schedule(self.sendLicenseNotice, time() + 4, errHandler=self)
 		self.set_terminator(b"\n")
 		self.submitError = 0
+		self.submitCount = 0
 		self.submitTimeCount = 0
 		self.lastSubmitTime = 0
 		self.lastSubmitJobId = 0
@@ -239,7 +241,7 @@ class StratumHandler(networkserver.SocketHandler):
 			self.logger.debug("Fix difficulty to %s for %d/%s@%s" % (diff, self._sid, self.UN[0], str(self.addr)))
 
 		if addTarget:
-			self.JobTargets[self.server.JobId] = target
+			self.JobTargets[self.server.JobId - 1] = target
 
 		return True
 
@@ -297,6 +299,15 @@ class StratumHandler(networkserver.SocketHandler):
 	def _stratum_mining_submit(self, username, jobid, extranonce2, ntime, nonce):
 		#if username not in self.Usernames:
 		#	raise StratumError(24, 'unauthorized-user')
+
+		self.submitCount += 1
+
+		if not jobid:
+			self.submitError += 1
+			if self.submitCount > 37 and self.submitError / self.submitCount > 0.37:
+				raise StratumError(errno, rej, False, 'Too many errors found in your submission, disconnect now.', True)
+			raise StratumError(errno, rej)
+
 		submitTime = time()
 		newBdiff = 0
 		if self.targetUp[2]:
@@ -380,15 +391,12 @@ class StratumHandler(networkserver.SocketHandler):
 			rej = str(rej)
 			errno = StratumCodes.get(rej, 20)
 			self.submitError += 1
-			if self.submitError < 10 or self.UA[0] == '37proxy':
-				raise StratumError(errno, rej)
-			raise StratumError(errno, rej, False, 'Too many errors found in your submission, disconnect now.', True)
+			if self.submitCount > 37 and self.submitError / self.submitCount > 0.37:
+				raise StratumError(errno, rej, False, 'Too many errors found in your submission, disconnect now.', True)
+			raise StratumError(errno, rej)
 
 		if self.targetUp[0]:
 			self.targetUp[0] -= share['targetUp']
-
-		if self.submitError:
-			self.submitError -= 1
 
 		return True
 
