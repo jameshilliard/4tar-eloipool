@@ -32,12 +32,13 @@ import logging
 
 config = None
 dynConfigItems = [
-	( 'DefaultShareTarget', 0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff ),
+	( 'DefaultShareTarget', 0x00000000ffff0000000000000000000000000000000000000000000000000000 ),
 	( 'MinSubmitInterval', 10 ),
 	( 'MaxSubmitInterval', 40 ),
 	( 'GetTxnsInterval', 10 ),
 	( 'RestartInterval', 601 ),
 	( 'JobUpdateInterval', 55 ),
+	( 'LastBlockTolerance', 0 ),
 	( 'NotifyAllJobs', False ),
 	( 'LogClient', False ),
 	( 'SessionIdRange', [ 4, 4, 0, 0xffff ] ),
@@ -295,7 +296,13 @@ def blockChanged():
 	if MM.lastBlock != (None, None, None):
 		global DupeShareHACK
 		DupeShareHACK = {}
-		workLog.clear()
+		if config.LastBlockTolerance:
+			if None in workLog:
+				workLog[None].clear()
+			if 'currjob' in workLog:
+				workLog['lastjob'] = (workLog['currjob'][0], time(), workLog['currjob'][1])
+		else:
+			workLog.clear()
 	stratumsrv.updateJob(wantClear=True, networkTarget=networkTarget)
 
 
@@ -367,13 +374,13 @@ import traceback
 
 def getStratumJob(jobid, wantClear = False):
 	MC = MM.getMC(wantClear)
-	(dummy, merkleTree, coinbase, prevBlock, bits) = MC[:5]
+	#(dummy, merkleTree, coinbase, prevBlock, bits) = MC[:5]
 	workLog.setdefault(None, {})[jobid] = (MC, time())
+	workLog['currjob'] = (jobid, workLog[None][jobid])
 	return workLog[None][jobid]
 
 def getExistingStratumJob(jobid):
-	wld = workLog[None][jobid]
-	return wld
+	return workLog[None][jobid]
 
 shareLoggers = []
 authenticators = []
@@ -484,18 +491,18 @@ def checkShare(share):
 	shareTime = share['time']
 	username = share['username']
 
-	# Stratum
 	isstratum = True
 	wli = share['jobid']
-	#buildStratumData(share, b'\0' * 32)
-	#othertxndata = b''
 	MWL = workLog[None]
-	if wli not in MWL:
+	if wli in MWL:
+		(wld, issueT) = MWL[wli]
+	elif config.LastBlockTolerance and 'lastjob' in workLog and workLog['lastjob'][0] == wli and workLog['lastjob'][1] + config.LastBlockTolerance > shareTime:
+		(wld, issueT) = workLog['lastjob'][2]
+	else:
 		raise RejectedShare('unknown-work')
-	(wld, issueT) = MWL[wli]
-	#mode = 'MC'
-	share['MC'] = wld
-	share['issuetime'] = issueT
+
+	#share['MC'] = wld
+	#share['issuetime'] = issueT
 
 	(workMerkleTree, workCoinbase) = wld[1:3]
 	share['merkletree'] = workMerkleTree
@@ -515,9 +522,6 @@ def checkShare(share):
 	cbtxn.setCoinbase(coinbase)
 	cbtxn.assemble()
 	data = buildStratumData(share, workMerkleTree.withFirst(cbtxn))
-	#shareMerkleRoot = data[36:68]
-	#if shareMerkleRoot != workMerkleTree.withFirst(cbtxn):
-	#	raise RejectedShare('bad-txnmrklroot')
 
 	if not pmConfig:
 		if data in DupeShareHACK:
