@@ -496,7 +496,12 @@ def checkShare(share):
 	MWL = workLog[None]
 	if wli in MWL:
 		(wld, issueT) = MWL[wli]
-	elif config.LastBlockTolerance and 'lastjob' in workLog and workLog['lastjob'][0] == wli and workLog['lastjob'][1] + config.LastBlockTolerance > shareTime:
+	elif config.LastBlockTolerance and 'lastjob' in workLog:
+		if workLog['lastjob'][1] + config.LastBlockTolerance < shareTime:
+			del workLog['lastjob']
+			raise RejectedShare('unknown-work')
+		if workLog['lastjob'][0] != wli:
+			raise RejectedShare('unknown-work')
 		(wld, issueT) = workLog['lastjob'][2]
 	else:
 		raise RejectedShare('unknown-work')
